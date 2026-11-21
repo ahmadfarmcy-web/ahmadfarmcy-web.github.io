@@ -168,7 +168,7 @@ const me={name:ls("name")||"",shift:ls("shift")||"صباحي"};
 let app,auth,db,unsub=null,started=false;
 try{
   app=initializeApp(firebaseConfig);auth=getAuth(app);
-  db=initializeFirestore(app,{localCache:persistentLocalCache({tabManager:persistentMultipleTabManager()})});
+  db=initializeFirestore(app,{experimentalAutoDetectLongPolling:true,localCache:persistentLocalCache({tabManager:persistentMultipleTabManager()})});
 }catch(e){$("#login").classList.remove("hide");$("#le").textContent="تأكد من بيانات Firebase في أول الملف."}
 if(auth)onAuthStateChanged(auth,u=>{
   if(u){$("#login").classList.add("hide");$("#app").classList.remove("hide");if(!started){started=true;start()}if(!me.name)askWho()}
@@ -194,6 +194,8 @@ function start(){
   },err=>{$("#dot").classList.add("off");say("مش قادر أقرا البيانات: "+err.code)});
 }
 
+const wfail=e=>{const m=e&&e.code==="permission-denied"?"❌ مفيش صلاحية للحفظ (راجع Rules في Firestore)":"❌ الحفظ فشل: "+((e&&e.code)||e);say(m);$("#dot").classList.add("off")};
+window.addEventListener("unhandledrejection",e=>{const c=e.reason&&e.reason.code;if(c)say("خطأ: "+c)});
 let tt;function say(m){const t=$("#toast");t.textContent=m;t.classList.remove("hide");clearTimeout(tt);tt=setTimeout(()=>t.classList.add("hide"),4500);if(navigator.vibrate)navigator.vibrate(60)}
 const paintWho=()=>$("#who").textContent=`${me.name||"؟"} • ${me.shift}`;
 $("#who").onclick=()=>askWho();
@@ -311,7 +313,7 @@ function openAdd(pre={}){
     const name=$("#n").value.trim();if(!name){$("#n").focus();return}
     const d=items.find(i=>i.status!=="arrived"&&norm(i.name)===norm(name));
     if(d&&!confirm("الصنف ده موجود بالفعل. تضيفه برضو؟"))return;
-    await put({name,qty:$("#k").value||1,kind:kd,customer:kd==="customer"?$("#cu").value.trim():"",phone:kd==="customer"?$("#ph").value.trim():"",note:$("#nt").value.trim(),urgent:$("#ur").checked});
+    put({name,qty:$("#k").value||1,kind:kd,customer:kd==="customer"?$("#cu").value.trim():"",phone:kd==="customer"?$("#ph").value.trim():"",note:$("#nt").value.trim(),urgent:$("#ur").checked}).catch(wfail);
     close();
   };
   $("#bulk").onclick=bulk;
@@ -342,7 +344,7 @@ function bulk(){
     for(const line of $("#tx").value.split(/\r?\n/)){
       const [nm,q]=line.split("\t").map(s=>s.trim());if(!nm)continue;
       if(have.has(norm(nm))){sk++;continue}
-      have.add(norm(nm));await put({name:nm,qty:parseInt(q)||1});n++;
+      have.add(norm(nm));put({name:nm,qty:parseInt(q)||1}).catch(wfail);n++;
     }
     close();say(`اتضاف ${n} صنف${sk?` وتخطيت ${sk} مكرر`:""}`);
   };
@@ -467,7 +469,7 @@ function importSheet(){
       const nm=c[0];if(!nm)continue;
       if(first){first=false;if(/^(الصنف|اسم|الاسم|name|item|م|#)/i.test(nm))continue}
       if(have.has(norm(nm))){skipped++;continue}
-      have.add(norm(nm));await put({name:nm,qty:parseInt(c[1])||1});added++;
+      have.add(norm(nm));put({name:nm,qty:parseInt(c[1])||1}).catch(wfail);added++;
     }
     close();
     say(`اتضاف ${added} صنف${skipped?`، وتخطيت ${skipped} مكرر`:""}`);
