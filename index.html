@@ -91,6 +91,22 @@ main{padding:12px 16px 110px;display:grid;gap:10px}
 .tab{font-size:14px}.sect.old{color:var(--need);font-weight:700}#dayf{grid-template-columns:repeat(3,1fr)}
 .item.urgent{border-inline-start-color:var(--bad)!important;background:#fff6f5}
 .fold{width:100%;padding:14px;font-weight:700;color:var(--need);border-color:var(--need);background:#fff}
+
+/* ===== مراحل الصنف ===== */
+.tabs{grid-template-columns:repeat(3,1fr)!important}@media(min-width:620px){.tabs{grid-template-columns:repeat(6,1fr)!important}}.tab{font-size:12.5px!important;padding:9px 2px!important;line-height:1.3}.tab b{font-size:17px!important}
+.stp{display:flex;align-items:flex-start;margin:6px 0 4px}
+.st{flex:1;display:flex;flex-direction:column;align-items:center;position:relative;text-align:center;min-width:0}
+.st::before{content:"";position:absolute;top:10px;inset-inline-start:50%;width:100%;height:3px;background:#e3ebe7}
+.st:last-child::before{display:none}.st.done::before{background:var(--ok)}
+.st i{position:relative;z-index:1;width:22px;height:22px;border-radius:50%;background:#e3ebe7;border:2px solid #e3ebe7;display:grid;place-items:center;font-size:12px;font-style:normal;color:#fff}
+.st.done i{background:var(--ok);border-color:var(--ok)}
+.st.cur i{background:#fff;border-color:var(--need);box-shadow:0 0 0 3px #f6e3c8}
+.st span{font-size:11.5px;margin-top:4px;color:var(--mute);line-height:1.3}
+.st.done span{color:var(--ink);font-weight:700}.st.cur span{color:var(--need);font-weight:700}
+.st small{font-size:10.5px;color:var(--mute)}
+.sline{border-radius:8px;padding:7px 10px;font-size:14px;font-weight:700;background:#fff4e0;color:var(--need)}
+.sline.s-ord{background:#e8f0fb;color:var(--ord)}.sline.s-ok{background:#e9f6ee;color:var(--ok)}.sline.s-bad{background:#fdecea;color:var(--bad)}.sline.s-gray{background:#eef2f0;color:var(--mute)}
+.item.nf,.item.ret{border-inline-start-color:var(--bad)}
 </style>
 </head>
 <body>
@@ -116,12 +132,14 @@ main{padding:12px 16px 110px;display:grid;gap:10px}
   <div class="tools">
     <button class="btn big" id="ordmode">📞 وضع الطلب من شركة</button>
     <button class="a hide" id="pend" style="border-color:var(--bad);color:var(--bad);font-weight:700;padding:12px"></button>
-    <input class="in" id="q" type="search" placeholder="ابحث عن صنف">
+    <input class="in" id="q" type="search" placeholder="ابحث بالصنف أو اسم العميل أو رقم تليفونه">
     <div class="tabs" role="tablist" id="tabs">
-      <button class="tab" role="tab" data-t="needed">مطلوب<b id="c1">0</b></button>
+      <button class="tab" role="tab" data-t="needed">مسجّل<b id="c1">0</b></button>
       <button class="tab" role="tab" data-t="ordered">اتطلب<b id="c2">0</b></button>
       <button class="tab" role="tab" data-t="arrived">وصل<b id="c3">0</b></button>
-      <button class="tab" role="tab" data-t="archive">أرشيف<b id="c4">0</b></button>
+      <button class="tab" role="tab" data-t="ret">مرتجع<b id="c4">0</b></button>
+      <button class="tab" role="tab" data-t="nf">مش لاقيينه<b id="c5">0</b></button>
+      <button class="tab" role="tab" data-t="archive">أرشيف<b id="c6">0</b></button>
     </div>
     <div class="seg" id="kindf" style="grid-template-columns:repeat(3,1fr)"><button data-k="all">الكل</button><button data-k="stock">📦 نواقص المخزن</button><button data-k="customer">👤 طلبات العملاء</button></div>
     <div class="seg" id="dayf"><button data-d="all">كل الأيام</button><button data-d="0">النهاردة</button><button data-d="1">إمبارح</button></div>
@@ -144,7 +162,7 @@ main{padding:12px 16px 110px;display:grid;gap:10px}
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {getAuth,signInWithEmailAndPassword,onAuthStateChanged,signOut} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import {initializeFirestore,persistentLocalCache,persistentMultipleTabManager,collection,addDoc,updateDoc,deleteDoc,doc,onSnapshot,query,orderBy,serverTimestamp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {initializeFirestore,persistentLocalCache,persistentMultipleTabManager,collection,addDoc,updateDoc,deleteDoc,doc,onSnapshot,query,orderBy,limit,setDoc,getDoc,serverTimestamp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 /* ====== الصق هنا بيانات Firebase (Project settings > General > pharmacy-web > Config) ====== */
 const firebaseConfig={
@@ -178,7 +196,7 @@ $("#lf").onsubmit=async e=>{e.preventDefault();$("#le").textContent="";
   try{await signInWithEmailAndPassword(auth,$("#em").value.trim(),$("#pw").value)}
   catch(err){$("#le").textContent="الإيميل أو كلمة السر غلط، جرّب تاني."}};
 function start(){
-  paintWho();
+  paintWho();onSnapshot(doc(db,"settings","main"),sn=>{if(sn.exists())cfg={...cfg,...sn.data()}},()=>{});
   unsub=onSnapshot(query(collection(db,"items"),orderBy("ts","desc")),snap=>{
     items=snap.docs.map(d=>({id:d.id,...d.data()}));
     if(!first)snap.docChanges().forEach(c=>{
@@ -219,73 +237,219 @@ $("#tabs").onclick=e=>{const b=e.target.closest(".tab");if(!b)return;tab=b.datas
 $("#q").oninput=render;
 
 function render(){renderOrd();
-  const q=norm($("#q").value||"");
+  const q=norm(String($("#q").value||"").replace(/[٠-٩]/g,d=>"٠١٢٣٤٥٦٧٨٩".indexOf(d)));
   const K=i=>kindf==="all"||kindOf(i)===kindf;
   const by=s=>items.filter(i=>i.status===s&&K(i));
   const tsMs=v=>v&&v.toDate?v.toDate().getTime():(typeof v==="number"?v:0);
   const dStart=ms=>{const d=new Date(ms);d.setHours(0,0,0,0);return d.getTime()};
   const t0=dStart(Date.now());
-  const msOf=i=>(i.status==="arrived"?(tsMs(i.arrivedAt)||tsMs(i.ts)):tsMs(i.ts))||Date.now();
+  const msOf=i=>(i.archived&&tsMs(i.archivedAt))||(i.delivered&&tsMs(i.deliveredAt))||(i.status==="arrived"&&tsMs(i.arrivedAt))||tsMs(i.ts)||Date.now();
   const ageOf=i=>Math.round((t0-dStart(msOf(i)))/864e5);
   const dateTxt=i=>{const d=new Date(msOf(i));return d.toLocaleDateString("ar-EG",{weekday:"long",day:"numeric",month:"long"})+" "+d.toLocaleDateString("en-GB")};
-  const arr=items.filter(i=>i.status==="arrived"&&K(i));
-  const src={needed:by("needed"),ordered:by("ordered"),arrived:arr.filter(i=>ageOf(i)<=1),archive:arr.filter(i=>ageOf(i)>1)};
-  ["needed","ordered","arrived","archive"].forEach((k,n)=>$("#c"+(n+1)).textContent=src[k].length);
+  const FLOW=Date.parse("2026-11-23T22:00:00Z");/* أصناف وصلت قبل التحديث ده بتتأرشف لوحدها (القديمة بس) */
+  const stg=i=>{if(i.archived)return"archive";if(i.retState)return"ret";if(i.notfound)return"nf";
+    if(i.status==="arrived"){if(i.delivered)return"archive";
+      if(i.archived===undefined&&i.delivered===undefined&&ageOf(i)>1&&msOf(i)<FLOW)return"archive";return"arrived"}
+    return i.status==="ordered"?"ordered":"needed"};
+  const src={needed:[],ordered:[],arrived:[],ret:[],nf:[],archive:[]};items.filter(K).forEach(i=>src[stg(i)].push(i));
+  ["needed","ordered","arrived","ret","nf","archive"].forEach((k,n)=>$("#c"+(n+1)).textContent=src[k].length);
   document.querySelectorAll(".tab").forEach(b=>b.setAttribute("aria-selected",b.dataset.t===tab));
-  const pend=items.filter(i=>i.status==="arrived"&&kindOf(i)==="customer"&&!i.notified);
-  $("#pend").classList.toggle("hide",!pend.length);$("#pend").textContent=`📞 ${pend.length} عميل وصله الصنف ولسه ما اتبلّغش`;
+  const pend=items.filter(i=>kindOf(i)==="customer"&&!i.notified&&!i.delivered&&!i.archived&&(i.status==="arrived"||i.notfound));
+  $("#pend").classList.toggle("hide",!pend.length);$("#pend").textContent=`📞 ${pend.length} عميل لازم نبلّغه (وصل صنفه أو الصنف مش متوفر)`;
   document.querySelectorAll("#kindf button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.k===kindf));
-  $("#dayf").classList.toggle("hide",tab==="archive");
+  $("#dayf").classList.toggle("hide",!!q||tab==="archive"||tab==="nf"||tab==="ret");
   document.querySelectorAll("#dayf button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.d===dayf));
-  let list=src[tab].filter(i=>!q||norm(i.name).includes(q)||(tab==="archive"&&norm(dateTxt(i)).includes(q)));
-  if(tab!=="archive"&&dayf!=="all")list=list.filter(i=>ageOf(i)===+dayf);
-  const U=i=>(tab==="needed"||tab==="ordered")&&i.urgent?1:0;
-  list.sort((x,y)=>U(y)-U(x)||msOf(y)-msOf(x));
+  const qd=String($("#q").value||"").replace(/[٠-٩]/g,d=>"٠١٢٣٤٥٦٧٨٩".indexOf(d)).replace(/\D/g,"");
+  const ORD=["needed","ordered","arrived","ret","nf","archive"],SN={needed:"📝 مسجّل",ordered:"📦 اتطلب",arrived:"✅ وصل",ret:"↩ مرتجع",nf:"❌ مش لاقيينه",archive:"🗄 أرشيف"};
+  const hit=i=>norm(i.name).includes(q)||norm(i.customer||"").includes(q)||(qd.length>=3&&String(i.phone||"").replace(/\D/g,"").includes(qd))||norm(dateTxt(i)).includes(q);
+  const U=i=>!q&&(tab==="needed"||tab==="ordered")&&i.urgent?1:0;
+  let list;
+  if(q){list=ORD.flatMap(k=>src[k]).filter(hit);list.sort((x,y)=>ORD.indexOf(stg(x))-ORD.indexOf(stg(y))||msOf(y)-msOf(x))}
+  else{list=src[tab].slice();
+    if(tab!=="archive"&&tab!=="nf"&&tab!=="ret"&&dayf!=="all")list=list.filter(i=>ageOf(i)===+dayf);
+    list.sort((x,y)=>U(y)-U(x)||msOf(y)-msOf(x));
+    if(tab==="ret")list.sort((x,y)=>(x.retState==="done"?1:0)-(y.retState==="done"?1:0)||msOf(y)-msOf(x))}
   const canFold=(tab==="needed"||tab==="ordered")&&!q&&dayf==="all";
   const isOld=i=>ageOf(i)>1&&!U(i)&&kindOf(i)!=="customer";
   const oldAll=canFold?list.filter(isOld):[];
   if(canFold&&!showOld[tab])list=list.filter(i=>!isOld(i));
   const oldBtn=oldAll.length?`<button class="a fold" data-fold="1">${showOld[tab]?"▲ إخفاء الأقدم":`▼ أقدم من يومين (${oldAll.length}) — اضغط للعرض`}</button>`:"";
   const L=$("#list");
-  if(!list.length&&!oldBtn){L.innerHTML=`<div class="empty">${q?"مفيش صنف بالاسم ده في التبويب ده.":tab==="archive"?"الأرشيف فاضي.<br>الأصناف اللي وصلت من أكتر من يومين بتتنقل هنا لوحدها.":dayf!=="all"?"مفيش أصناف في اليوم ده.":tab==="needed"?"مفيش نواقص دلوقتي.<br>اضغط «+ صنف ناقص» عشان تضيف.":"مفيش أصناف هنا."}</div>`;return}
+  if(!list.length&&!oldBtn){L.innerHTML=`<div class="empty">${q?"مفيش نتيجة للبحث ده.<br>جرّب اسم الصنف أو اسم العميل أو جزء من رقم تليفونه.":tab==="archive"?"الأرشيف فاضي.<br>الصنف بيتنقل هنا لما يتسلّم للعميل أو لما تضغط «🗄 أرشفة».":tab==="ret"?"مفيش مرتجعات.<br>لو صنف مكتوب في الفاتورة وما وصلش، أو وصل وفيه مشكلة، اضغط «مرتجع» عليه.":tab==="nf"?"مفيش أصناف مش لاقيينها.<br>لو عميل طلب صنف وملقيناهوش، اضغط «❌ مش لاقيينه» على الصنف.":dayf!=="all"?"مفيش أصناف في اليوم ده.":tab==="needed"?"مفيش نواقص دلوقتي.<br>اضغط «+ صنف ناقص» عشان تضيف.":"مفيش أصناف هنا."}</div>`;return}
   let last="";
-  L.innerHTML=list.map(i=>{
-    const ag=ageOf(i),lb=U(i)?"🔥 مستعجل":tab==="archive"?dateTxt(i).split(" ").slice(0,-1).join(" "):ag<=0?"النهاردة":ag===1?"إمبارح":(tab==="arrived"?"أقدم":"أقدم — لسه مستني");
-    const head=lb!==last?`<div class="sect${ag>1&&!U(i)&&tab!=="archive"&&tab!=="arrived"?" old":""}">${lb}</div>`:"";last=lb;
+  const srTop=q?`<div class="meta" style="margin:4px 2px 0">🔎 ${list.length} نتيجة في كل المراحل</div>`:"";
+  const retTop=!q&&tab==="ret"&&items.some(i=>i.retState==="pending")?`<button class="btn big" data-sendret="1" style="background:var(--ord)">📤 رسالة مرتجعات لشركة</button>`:"";
+  L.innerHTML=srTop+retTop+list.map(i=>{
+    const ag=ageOf(i),lb=q?SN[stg(i)]:tab==="ret"?(i.retState==="done"?"✅ تم عمل مرتجع":"↩ لازم يتعمل مرتجع"):U(i)?"🔥 مستعجل":tab==="archive"?dateTxt(i).split(" ").slice(0,-1).join(" "):ag<=0?"النهاردة":ag===1?"إمبارح":(tab==="arrived"?"أقدم":"أقدم — لسه مستني");
+    const head=lb!==last?`<div class="sect${!q&&ag>1&&!U(i)&&tab!=="archive"&&tab!=="arrived"?" old":""}">${lb}</div>`:"";last=lb;
     const when=i.ts?.toDate?i.ts.toDate().toLocaleDateString("ar-EG",{day:"numeric",month:"short"}):"";
-    const ordLine=i.status!=="needed"?`<div class="meta flag">اتطلب بواسطة ${esc(i.orderedBy||"")}${i.supplier?" من "+esc(i.supplier):""}</div>`:"";
+    const isC=kindOf(i)==="customer",stage=stg(i);
+    const dt=v=>{const m=tsMs(v);return m?new Date(m).toLocaleDateString("ar-EG",{day:"numeric",month:"short"}):""};
+    const steps=[["اتسجّل",true,i.ts],["اتطلب",i.status!=="needed",i.orderedAt],["وصل",i.status==="arrived",i.arrivedAt]];
+    if(isC)steps.push(["اتبلّغ",!!i.notified,i.notifiedAt],["اتسلّم",!!i.delivered,i.deliveredAt]);
+    const curIdx=steps.findIndex(x=>!x[1]);
+    const stepper=stage==="nf"||stage==="ret"?"":`<div class="stp">${steps.map((x,n)=>`<div class="st ${x[1]?"done":n===curIdx?"cur":""}"><i>${x[1]?"✓":""}</i><span>${x[0]}</span><small>${x[1]?dt(x[2]):""}</small></div>`).join("")}</div>`;
+    let sl=["⏳ لسه ما اتطلبش من الشركة",""];
+    if(stage==="ret")sl=i.retState==="done"?["✅ تم عمل مرتجع — إشعار رقم "+esc(i.retNotice||"—")+(i.retReason?" ("+esc(i.retReason)+")":""),"s-ok"]:["↩ لازم يتعمل مرتجع — "+esc(i.retReason||"")+(i.retQty?" • الكمية "+esc(i.retQty):"")+(i.retInvoice?" • فاتورة رقم "+esc(i.retInvoice):"")+(i.supplier?" • "+esc(i.supplier):"")+(i.retPhoto?" • 🧾 فيه صورة":"")+(i.retSupSent?" • ✔ المورد اتبلّغ":"")+(i.retSupvSent?" • ✔ المشرف اتبلّغ":""),"s-bad"];
+    else if(stage==="nf")sl=["❌ مش لاقيينه"+(i.nfNote?" — "+esc(i.nfNote):""),"s-bad"];
+    else if(i.archived||stage==="archive")sl=[i.retState==="done"?"↩ مرتجع — إشعار رقم "+esc(i.retNotice||"—"):i.delivered?"🤝 اتسلّم للعميل":i.notfound?"❌ مش لاقيينه":"🗄 مؤرشف","s-gray"];
+    else if(i.status==="ordered")sl=["📦 اتطلب"+(i.supplier?" من "+esc(i.supplier):"")+" بواسطة "+esc(i.orderedBy||"")+" — مستني الوصول","s-ord"];
+    else if(i.status==="arrived")sl=[isC?(i.notified?"📞 العميل اتبلّغ — مستني يستلم":"✅ وصل — لازم تبلّغ العميل"):"✅ وصل","s-ok"];
+    else if(isC&&(i.unav||[]).length&&(i.unav||[]).length>=sups().length)sl=["⚠️ مش موجود عند كل الشركات — لو مش هتلاقيه اضغط «مش لاقيينه»","s-bad"];
+    const ordLine=`<div class="sline ${sl[1]}">${sl[0]}</div>`;
 const tel=String(i.phone||"").replace(/[^\d+]/g,"");
-    const txt=i.status==="arrived"?`أهلاً ${i.customer||""}، الصنف «${i.name}» وصل صيدلية أحمد نبيه. تشرفنا بزيارتك.`:`أهلاً ${i.customer||""}، بخصوص «${i.name}»: بنوفره لحضرتك وهنبلغك أول ما يوصل. صيدلية أحمد نبيه.`;
+    const txt=i.notfound?`أهلاً ${i.customer||""}، للأسف الصنف «${i.name}» غير متوفر حاليًا عند الموردين، وهنبلغ حضرتك لو توفّر. صيدلية أحمد نبيه.`:i.status==="arrived"?`أهلاً ${i.customer||""}، الصنف «${i.name}» وصل صيدلية أحمد نبيه. تشرفنا بزيارتك.`:`أهلاً ${i.customer||""}، بخصوص «${i.name}»: بنوفره لحضرتك وهنبلغك أول ما يوصل. صيدلية أحمد نبيه.`;
     const contact=tel?`<a class="a" href="tel:${tel}">📞 اتصال</a><a class="a" href="sms:${tel}?body=${encodeURIComponent(txt)}">✉️ رسالة</a><a class="a" target="_blank" rel="noopener" href="https://wa.me/${waNum(i.phone)}?text=${encodeURIComponent(txt)}">واتساب</a>`:"";
-    const notif=kindOf(i)==="customer"?`<button class="a" data-a="notif">${i.notified?"إلغاء علامة اتبلّغ":"✔ اتبلّغ العميل"}</button>`:"";
-    return head+`<article class="item ${i.status}${i.urgent?" urgent":""}" data-id="${i.id}">
+    const notif=isC&&stage!=="archive"?`<button class="a" data-a="notif">${i.notified?"إلغاء علامة اتبلّغ":"✔ اتبلّغ العميل"}</button>`:"";
+    const deliver=isC&&stage==="arrived"?`<button class="a g" data-a="deliver">🤝 اتسلّم للعميل</button>`:"";
+    const retBtn=stage==="ordered"?`<button class="a d" data-a="ret">📄 في الفاتورة ولم يصل</button>`:stage==="arrived"?`<button class="a d" data-a="ret">↩ مرتجع</button>`:"";
+    const retAct=stage==="ret"?`<button class="a" data-a="photo">🧾 ${i.retPhoto?"صورة الفاتورة":"أضف صورة الفاتورة"}</button>`+(i.retState==="done"?`<button class="a" data-a="retdone">✏️ تعديل رقم الإشعار</button>`:`<button class="a g" data-a="retdone">✔ تم عمل مرتجع</button><button class="a" data-a="retnotify">📲 إشعار المورد والمشرف</button><button class="a" data-a="retcancel">إلغاء المرتجع</button>`):"";
+    const nfBtn=isC&&(stage==="needed"||stage==="ordered")?`<button class="a d" data-a="nf">❌ مش لاقيينه</button>`:"";
+    const arch=stage==="arrived"||stage==="nf"||(stage==="ret"&&i.retState==="done")?`<button class="a" data-a="archive">🗄 أرشفة</button>`:"";
+    const unnf=stage==="nf"?`<button class="a" data-a="unnf">↩ رجّعه للطلب</button>`:"";
+    const restore=stage==="archive"?`<button class="a" data-a="restore">↩ إرجاع من الأرشيف</button>`:"";
+    return head+`<article class="item ${i.status}${i.urgent?" urgent":""}${stage==="nf"?" nf":""}${stage==="ret"?" ret":""}" data-id="${i.id}">
       <div class="top"><div class="nm">${i.urgent?"🔥 ":""}${kindOf(i)==="customer"?"👤 ":""}${esc(i.name)}</div><div class="qty">${esc(i.qty||1)}</div></div>
       <div class="meta">${esc(i.by||"")} • شيفت ${esc(i.shift||"")} ${when?"• "+when:""}${i.customer||i.phone?`<br>العميل: ${esc(i.customer||"")} <span dir="ltr">${esc(i.phone||"")}</span>${i.notified?` <b class="flag" style="color:var(--ok)">✔ اتبلّغ</b>`:""}`:""}${i.note?`<br>${esc(i.note)}`:""}</div>
-      ${ordLine}
+      ${stepper}${ordLine}
       <div class="acts">
-        ${i.status==="needed"?`<button class="a p" data-a="order">اتطلب</button>`:""}
-        ${i.status==="ordered"?`<button class="a g" data-a="arrive">وصل</button><button class="a" data-a="back">رجّعه مطلوب</button>`:""}
-        ${contact}${notif}${i.status!=="arrived"?`<button class="a" data-a="urg">${i.urgent?"إلغاء مستعجل":"🔥 مستعجل"}</button>`:""}<button class="a" data-a="edit">تعديل</button>
+        ${stage==="needed"?`<button class="a p" data-a="order">📝 سجّل الطلب</button>`:""}
+        ${stage==="ordered"?`<button class="a g" data-a="arrivemenu">وصل ▾</button><button class="a" data-a="back">رجّعه لمسجّل</button>`:""}
+        ${deliver}${retBtn}${retAct}${contact}${notif}${nfBtn}${unnf}${arch}${restore}${stage==="needed"||stage==="ordered"?`<button class="a" data-a="urg">${i.urgent?"إلغاء مستعجل":"🔥 مستعجل"}</button>`:""}<button class="a" data-a="edit">تعديل</button>
         <button class="a d" data-a="del">حذف</button>
       </div></article>`}).join("")+(list.length?"":`<div class="empty">مفيش أصناف النهاردة وإمبارح.</div>`)+oldBtn;
 }
 function waNum(p){let n=String(p).replace(/\D/g,"");if(n.startsWith("00"))n=n.slice(2);if(n.startsWith("0"))n="2"+n;return n}
 
 $("#list").onclick=async e=>{
+  const sr=e.target.closest("button[data-sendret]");if(sr)return sendReturns();
   const f=e.target.closest("button[data-fold]");if(f){showOld[tab]=!showOld[tab];render();return}
   const b=e.target.closest("button[data-a]");if(!b)return;
   const id=b.closest(".item").dataset.id,it=items.find(x=>x.id===id),a=b.dataset.a;
   if(a==="order")return askOrder(it);
+  if(a==="arrivemenu")return askArrive(it);
+  if(a==="retnotify")return notifyReturn(it);
+  if(a==="photo")return photoSheet(it);
   if(a==="arrive")return updateDoc(doc(db,"items",id),{status:"arrived",arrivedBy:me.name,arrivedAt:serverTimestamp()});
   if(a==="back")return updateDoc(doc(db,"items",id),{status:"needed"});
   if(a==="urg")return updateDoc(doc(db,"items",id),{urgent:!it.urgent});
   if(a==="edit")return askEdit(it);
-  if(a==="notif")return updateDoc(doc(db,"items",id),{notified:!it.notified});
+  if(a==="notif")return updateDoc(doc(db,"items",id),it.notified?{notified:false}:{notified:true,notifiedAt:serverTimestamp()});
+  if(a==="ret")return askReturn(it);
+  if(a==="retdone")return askRetDone(it);
+  if(a==="retcancel"&&confirm("تلغي المرتجع؟"))return updateDoc(doc(db,"items",id),{retState:""});
+  if(a==="deliver")return updateDoc(doc(db,"items",id),{delivered:true,deliveredAt:serverTimestamp(),deliveredBy:me.name,notified:true,...(it.notified?{}:{notifiedAt:serverTimestamp()})});
+  if(a==="nf")return askNotFound(it);
+  if(a==="unnf")return updateDoc(doc(db,"items",id),{notfound:false});
+  if(a==="archive")return updateDoc(doc(db,"items",id),{archived:true,archivedAt:serverTimestamp(),archivedBy:me.name});
+  if(a==="restore")return updateDoc(doc(db,"items",id),{archived:false,delivered:false,notfound:false});
   if(a==="del"&&confirm(`تحذف «${it.name}»؟`))return deleteDoc(doc(db,"items",id));
 };
 
+const RET_WHY=["لم يصل (مكتوب في الفاتورة)","ناقص كمية","تالف","قرب انتهاء","غلط في الصنف"];
+function askArrive(it){
+  open(`<h2>«${esc(it.name)}» وصل؟</h2>
+  <button class="btn" data-c="ok" style="background:var(--ok)">✅ وصل سليم</button>
+  <button class="btn" data-c="bad" style="background:#b3261e">↩ وصل ومحتاج مرتجع<br><small style="font-weight:400">تالف • قرب انتهاء • غلط في الصنف • ناقص كمية</small></button>
+  <button class="btn" data-c="miss" style="background:#8a4b00">📦 مسجّل في الفاتورة ولم يصل<br><small style="font-weight:400">مش موجود في الكراتين • لازم يترجع</small></button>
+  <button class="a" data-c="x">إلغاء</button>`);
+  $(".panel").onclick=e=>{const b=e.target.closest("button[data-c]");if(!b)return;const c=b.dataset.c;
+    if(c==="x"){close();return}
+    if(c==="ok"){close();updateDoc(doc(db,"items",it.id),{status:"arrived",arrivedBy:me.name,arrivedAt:serverTimestamp()}).catch(wfail);return}
+    if(c==="bad")return askReturn(it,{arrive:true,why:"ناقص كمية"});
+    askReturn(it,{why:RET_WHY[0]})};
+}
+const imgToData=file=>new Promise((res,rej)=>{const r=new FileReader();r.onerror=rej;r.onload=()=>{const im=new Image();im.onerror=rej;im.onload=()=>{
+  let w=im.width,h=im.height;const m=1400;if(Math.max(w,h)>m){const k=m/Math.max(w,h);w=Math.round(w*k);h=Math.round(h*k)}
+  const c=document.createElement("canvas");c.width=w;c.height=h;c.getContext("2d").drawImage(im,0,0,w,h);
+  let q=.7,d=c.toDataURL("image/jpeg",q);while(d.length>850000&&q>.3){q-=.1;d=c.toDataURL("image/jpeg",q)}res(d)};im.src=r.result};r.readAsDataURL(file)});
+const shareImg=async(data,title)=>{try{const b=await (await fetch(data)).blob();const f=new File([b],"invoice.jpg",{type:"image/jpeg"});
+  if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],text:title});return}}catch(e){if(e&&e.name==="AbortError")return}
+  say("جهازك مش بيدعم مشاركة الصورة من هنا. افتح «🧾 صورة الفاتورة» واحفظ الصورة وابعتها يدوي.")};
+const PHOTO_PICK=`<label class="a" style="display:block;text-align:center;cursor:pointer">📷 صوّر الفاتورة أو اختار صورة<input type="file" id="rp" accept="image/*" hidden></label><img id="rpv" class="hide" alt="" style="width:100%;border-radius:10px">`;
+function askReturn(it,opt={}){
+  let why=opt.why||(it.status==="ordered"?RET_WHY[0]:RET_WHY[1]),photo=null;
+  const list=opt.arrive?RET_WHY.slice(1):RET_WHY;
+  open(`<h2>مرتجع «${esc(it.name)}»</h2>
+  <div class="seg" id="rw" style="grid-template-columns:1fr 1fr">${list.map(w=>`<button data-w="${esc(w)}" aria-pressed="${w===why}">${esc(w)}</button>`).join("")}</div>
+  <input class="in" id="rs" placeholder="اسم الشركة / المورد" value="${esc(it.supplier||ls("lastSupplier")||"")}">
+  <div class="row"><input class="in" id="ri" placeholder="رقم فاتورة الشراء (اختياري)" dir="ltr"><input class="in" id="rq" type="number" min="1" value="${esc(it.qty||1)}" inputmode="numeric"></div>
+  <input class="in" id="rn" placeholder="ملاحظة (اختياري)">
+  ${PHOTO_PICK}
+  <button class="btn" id="rok">تسجيل المرتجع وإشعار المورد والمشرف</button><button class="a" id="rx">إلغاء</button>`);
+  $(".panel").onclick=null;
+  $("#rx").onclick=close;
+  $("#rw").onclick=e=>{const b=e.target.closest("button");if(!b)return;why=b.dataset.w;[...$("#rw").children].forEach(x=>x.setAttribute("aria-pressed",x===b))};
+  $("#rp").onchange=async e=>{const f=e.target.files[0];if(!f)return;try{photo=await imgToData(f);$("#rpv").src=photo;$("#rpv").classList.remove("hide")}catch(_){say("الصورة ما اتحمّلتش، جرّب صورة تانية.")}};
+  $("#rok").onclick=()=>{const sp=$("#rs").value.trim();if(sp)ls("lastSupplier",sp);
+    const d={retState:"pending",retReason:why,retInvoice:$("#ri").value.trim(),retQty:+$("#rq").value||1,retNote:$("#rn").value.trim(),retBy:me.name,retAt:serverTimestamp(),retSupSent:false,retSupvSent:false,supplier:sp};
+    if(opt.arrive){d.status="arrived";d.arrivedBy=me.name;d.arrivedAt=serverTimestamp()}
+    if(photo){d.retPhoto=true;setDoc(doc(db,"photos",it.id),{item:it.id,data:photo,by:me.name,ts:serverTimestamp()}).catch(wfail)}
+    updateDoc(doc(db,"items",it.id),d).catch(wfail);
+    notifyReturn({...it,...d},photo)};
+}
+function photoSheet(it){
+  let data=null;
+  open(`<h2>🧾 فاتورة «${esc(it.name)}»</h2><div id="pv" class="meta">جارٍ التحميل…</div>
+  <label class="a" style="display:block;text-align:center;cursor:pointer">📷 أضف أو غيّر الصورة<input type="file" id="pp" accept="image/*" hidden></label>
+  <button class="btn" id="psh" style="background:#2e5aa8">📎 إرسال الصورة على واتساب</button><button class="a" id="px">إغلاق</button>`);
+  $("#px").onclick=close;
+  const show=()=>{$("#pv").innerHTML=data?`<img src="${data}" alt="صورة الفاتورة" style="width:100%;border-radius:10px">`:"مفيش صورة لسه."};
+  getDoc(doc(db,"photos",it.id)).then(sn=>{data=sn.exists()?sn.data().data:null;show()}).catch(()=>{$("#pv").textContent="تعذّر تحميل الصورة."});
+  $("#pp").onchange=async e=>{const f=e.target.files[0];if(!f)return;try{data=await imgToData(f);show();
+    await setDoc(doc(db,"photos",it.id),{item:it.id,data,by:me.name,ts:serverTimestamp()});await updateDoc(doc(db,"items",it.id),{retPhoto:true})}catch(err){wfail(err)}};
+  $("#psh").onclick=()=>{if(!data){say("مفيش صورة تتبعت.");return}shareImg(data,`فاتورة ${it.supplier||""} — ${it.name}`)};
+}
+function notifyReturn(it,photoData){
+  const sup=it.supplier||"المورد",miss=String(it.retReason||"").startsWith("لم يصل");
+  const base=`الصنف: ${it.name}\nالكمية: ${it.retQty||it.qty||1}\nالسبب: ${it.retReason||""}${it.retInvoice?"\nفاتورة رقم: "+it.retInvoice:""}`;
+  const mSup=miss
+    ?`السادة شركة ${sup}\nإشعار نقص من صيدلية أحمد نبيه:\nالصنف التالي مسجّل في فاتورتكم${it.retInvoice?" رقم "+it.retInvoice:""} ولم يصل ضمن الطلبية (غير موجود في الكراتين):\nالصنف: ${it.name}\nالكمية: ${it.retQty||it.qty||1}\nبرجاء إصدار إشعار مرتجع/خصم أو توريد الصنف، وإفادتنا برقم الإشعار. شكرًا لحضرتكم.`
+    :`السادة شركة ${sup}\nإشعار مرتجع من صيدلية أحمد نبيه:\n${base}\nبرجاء إصدار إشعار المرتجع وإفادتنا برقمه. شكرًا لحضرتكم.`;
+  const mSv=`تنبيه لمشرف الصيدلية: ${miss?"صنف مسجّل في الفاتورة ولم يصل":"اتسجّل مرتجع جديد"}.\nالشركة: ${sup}\n${base}\nسجّله: ${me.name} (شيفت ${me.shift})`;
+  const sentS=!!it.retSupSent,sentV=!!it.retSupvSent,hasP=!!(it.retPhoto||photoData);
+  open(`<h2>📲 ${miss?"إشعار: الصنف لم يصل":"إشعار المرتجع"}</h2>
+    <p class="meta">${esc(it.name)} — ${esc(it.retReason||"")}. اضغط الزرار وواتساب هيفتح بالرسالة جاهزة، وإنت بتضغط إرسال.</p>
+    <div class="meta" style="margin-top:6px"><b>المورد: ${esc(sup)}</b></div>
+    <input class="in" id="np1" type="tel" dir="ltr" placeholder="رقم واتساب المورد" value="${esc(getPhone(sup))}">
+    <button class="btn" id="ns1" style="background:var(--ok)">${sentS?"✔ اتبعت — ابعت تاني":"📲 واتساب للمورد"}</button>
+    <div class="meta" style="margin-top:10px"><b>مشرف الصيدلية</b></div>
+    <input class="in" id="np2" type="tel" dir="ltr" placeholder="رقم واتساب المشرف" value="${esc(getSupv())}">
+    <button class="btn" id="ns2" style="background:var(--ok)">${sentV?"✔ اتبعت — ابعت تاني":"📲 واتساب للمشرف"}</button>
+    ${hasP?`<button class="btn" id="nsp" style="background:#2e5aa8">📎 إرسال صورة الفاتورة</button>`:""}
+    <button class="a" id="nx">تم</button>`);
+  $("#nx").onclick=close;
+  $("#ns1").onclick=()=>{const p=$("#np1").value.trim();if(p)setPhone(sup,p);waOpen(p,mSup);updateDoc(doc(db,"items",it.id),{retSupSent:true}).catch(()=>{});$("#ns1").textContent="✔ اتبعت — ابعت تاني"};
+  $("#ns2").onclick=()=>{const p=$("#np2").value.trim();if(p)setSupv(p);waOpen(p,mSv);updateDoc(doc(db,"items",it.id),{retSupvSent:true}).catch(()=>{});$("#ns2").textContent="✔ اتبعت — ابعت تاني"};
+  if(hasP)$("#nsp").onclick=async()=>{let d=photoData;if(!d){try{const sn=await getDoc(doc(db,"photos",it.id));d=sn.exists()?sn.data().data:null}catch(_){}}
+    if(!d){say("الصورة مش متاحة.");return}shareImg(d,`فاتورة ${sup} — ${it.name}`)};
+}
+function askRetDone(it){
+  open(`<h2>تم عمل مرتجع «${esc(it.name)}»</h2>
+  <input class="in" id="rno" placeholder="رقم إشعار المرتجع" value="${esc(it.retNotice||"")}" dir="ltr" autocomplete="off">
+  <button class="btn" id="rok">تأكيد</button><button class="a" id="rx">إلغاء</button>`);
+  $("#rno").focus();$("#rx").onclick=close;
+  $("#rok").onclick=()=>{const n=$("#rno").value.trim();if(!n){$("#rno").focus();return}close();
+    updateDoc(doc(db,"items",it.id),{retState:"done",retNotice:n,retDoneAt:serverTimestamp(),retDoneBy:me.name}).catch(wfail)};
+}
+function sendReturns(){
+  const P=items.filter(i=>i.retState==="pending");if(!P.length){say("مفيش مرتجعات مستنية.");return}
+  const sp=[...new Set(P.map(i=>i.supplier||"بدون شركة"))];
+  open(`<h2>رسالة مرتجعات لشركة</h2>`+sp.map(x=>`<button class="btn" data-sp="${esc(x)}">${esc(x)} (${P.filter(i=>(i.supplier||"بدون شركة")===x).length} صنف)</button>`).join("")+`<button class="a" id="rx">إلغاء</button>`);
+  $("#rx").onclick=close;
+  $(".panel").onclick=e=>{const b=e.target.closest("button[data-sp]");if(!b)return;const x=b.dataset.sp;
+    const L=P.filter(i=>(i.supplier||"بدون شركة")===x);
+    const msg=`السادة شركة ${x}\nمرتجع صيدلية أحمد نبيه:\n`+L.map((i,n)=>`${n+1}- ${i.name} (${i.retQty||i.qty||1}) — ${i.retReason||""}${i.retInvoice?" — فاتورة رقم "+i.retInvoice:""}`).join("\n")+`\nبرجاء إصدار إشعار المرتجع وإفادتنا برقمه. شكرًا لحضرتكم.`;
+    waOpen(getPhone(x),msg);close()};
+}
+function askNotFound(it){
+  open(`<h2>«${esc(it.name)}» مش لاقيينه</h2><p class="meta">هيتنقل لتبويب «مش لاقيينه»، وتقدر تبلّغ العميل وتؤرشفه بعدها.</p>
+  <input class="in" id="nfn" placeholder="ملاحظة (اختياري)، مثلًا: مسحوب من السوق" value="${esc(it.nfNote||"")}"><button class="btn" id="nfok">تأكيد</button><button class="a" id="nfx">إلغاء</button>`);
+  $("#nfx").onclick=close;
+  $("#nfok").onclick=()=>{const n=$("#nfn").value.trim();close();updateDoc(doc(db,"items",it.id),{notfound:true,notfoundAt:serverTimestamp(),notfoundBy:me.name,nfNote:n}).catch(wfail)};
+}
 function askOrder(it){
-  open(`<h2>اتطلب «${esc(it.name)}»</h2><input class="in" id="sp" placeholder="اسم المورد (اختياري)" value="${esc(ls("lastSupplier")||"")}"><button class="btn" id="ok">تأكيد الطلب</button>`);
+  open(`<h2>تسجيل طلب «${esc(it.name)}» من الشركة</h2><input class="in" id="sp" placeholder="اسم المورد (اختياري)" value="${esc(ls("lastSupplier")||"")}"><button class="btn" id="ok">تأكيد الطلب</button>`);
   $("#ok").onclick=async()=>{const s=$("#sp").value.trim();ls("lastSupplier",s);close();
     await updateDoc(doc(db,"items",it.id),{status:"ordered",supplier:s,orderedBy:me.name,orderedAt:serverTimestamp()})};
 }
@@ -306,7 +470,7 @@ function openAdd(pre={}){
   $("#n").focus();
   $("#n").oninput=()=>{
     const v=norm($("#n").value),d=v.length>1&&items.find(i=>i.status!=="arrived"&&norm(i.name)===v);
-    $("#dup").innerHTML=d?`<div class="warn">⚠️ «${esc(d.name)}» ${d.status==="ordered"?"اتطلب بالفعل بواسطة "+esc(d.orderedBy||"زميل"):"موجود في المطلوب"} — متضيفوش تاني.</div>`:"";
+    $("#dup").innerHTML=d?`<div class="warn">⚠️ «${esc(d.name)}» ${d.status==="ordered"?"اتطلب بالفعل بواسطة "+esc(d.orderedBy||"زميل"):"مسجّل بالفعل"} — متضيفوش تاني.</div>`:"";
   };
   if(pre.name)$("#n").oninput();
   $("#sv").onclick=async()=>{
@@ -411,16 +575,16 @@ function restoreSheet(){
 
 /* ===== عملاء لسه ما اتبلّغوش ===== */
 function pendSheet(){
-  const list=items.filter(i=>i.status==="arrived"&&kindOf(i)==="customer"&&!i.notified);
+  const list=items.filter(i=>kindOf(i)==="customer"&&!i.notified&&!i.delivered&&!i.archived&&(i.status==="arrived"||i.notfound));
   if(!list.length){say("مفيش عملاء مستنيين.");return}
-  open(`<h2>عملاء لسه ما اتبلّغوش</h2>`+list.map(i=>{
-    const tel=String(i.phone||"").replace(/[^\d+]/g,""),t=`أهلاً ${i.customer||""}، الصنف «${i.name}» وصل صيدلية أحمد نبيه. تشرفنا بزيارتك.`;
+  open(`<h2>عملاء لازم نبلّغهم</h2>`+list.map(i=>{
+    const tel=String(i.phone||"").replace(/[^\d+]/g,""),t=i.notfound?`أهلاً ${i.customer||""}، للأسف الصنف «${i.name}» غير متوفر حاليًا عند الموردين، وهنبلغ حضرتك لو توفّر. صيدلية أحمد نبيه.`:`أهلاً ${i.customer||""}، الصنف «${i.name}» وصل صيدلية أحمد نبيه. تشرفنا بزيارتك.`;
     return `<div class="item arrived" data-id="${i.id}"><div class="top"><div class="nm">${esc(i.name)}</div></div>
       <div class="meta">${esc(i.customer||"")} <span dir="ltr">${esc(i.phone||"")}</span></div>
       <div class="acts">${tel?`<a class="a" href="tel:${tel}">📞 اتصال</a><a class="a" href="sms:${tel}?body=${encodeURIComponent(t)}">✉️ رسالة</a><a class="a" target="_blank" rel="noopener" href="https://wa.me/${waNum(i.phone)}?text=${encodeURIComponent(t)}">واتساب</a>`:""}<button class="a g" data-p="${i.id}">✔ اتبلّغ</button></div></div>`}).join("")+`<button class="a" id="px">إغلاق</button>`);
   $("#px").onclick=close;
   $(".panel").onclick=async e=>{const b=e.target.closest("button[data-p]");if(!b)return;
-    await updateDoc(doc(db,"items",b.dataset.p),{notified:true});b.closest(".item").remove();if(!$(".panel .item"))close()};
+    await updateDoc(doc(db,"items",b.dataset.p),{notified:true,notifiedAt:serverTimestamp()});b.closest(".item").remove();if(!$(".panel .item"))close()};
 }
 $("#pend").onclick=pendSheet;
 
@@ -432,13 +596,21 @@ function sendOrder(){
   const msg=`السادة شركة ${cur}\nطلبية صيدلية أحمد نبيه:\n`+done.map((i,n)=>`${n+1}- ${i.name}${+i.qty>1?" ("+i.qty+")":""}`).join("\n")+`\nشكرًا لحضرتكم.`;
   open(`<h2>إرسال الطلب لـ ${esc(cur)}</h2>
   <textarea class="in" id="sm" rows="9">${esc(msg)}</textarea>
-  <input class="in" id="sp2" type="tel" dir="ltr" placeholder="رقم واتساب الشركة (اختياري، بيتحفظ)" value="${esc(phones()[cur]||"")}">
+  <input class="in" id="sp2" type="tel" dir="ltr" placeholder="رقم واتساب الشركة (اختياري، بيتحفظ)" value="${esc(getPhone(cur))}">
   <button class="btn" id="sg">فتح واتساب</button><button class="a" id="sc">إلغاء</button>`);
   $("#sc").onclick=close;
-  $("#sg").onclick=()=>{const p=$("#sp2").value.trim(),m=phones();if(p){m[cur]=p;ls("supPhones",JSON.stringify(m))}
+  $("#sg").onclick=()=>{const p=$("#sp2").value.trim();if(p)setPhone(cur,p)
     const a=document.createElement("a");a.href="https://wa.me/"+(p?waNum(p):"")+"?text="+encodeURIComponent($("#sm").value);a.target="_blank";a.rel="noopener";document.body.appendChild(a);a.click();a.remove();close()};
 }
 
+/* ===== أرقام الشركات والمشرف (مشتركة) ===== */
+let cfg={supPhones:{},supervisor:""};
+const getPhone=n=>(cfg.supPhones&&cfg.supPhones[n])||(()=>{try{return JSON.parse(ls("supPhones")||"{}")[n]||""}catch(e){return""}})();
+const setPhone=(n,p)=>{try{const m=JSON.parse(ls("supPhones")||"{}");m[n]=p;ls("supPhones",JSON.stringify(m))}catch(e){}
+  cfg={...cfg,supPhones:{...(cfg.supPhones||{}),[n]:p}};setDoc(doc(db,"settings","main"),{supPhones:{[n]:p}},{merge:true}).catch(()=>{})};
+const getSupv=()=>cfg.supervisor||ls("supervisor")||"";
+const setSupv=p=>{ls("supervisor",p);cfg={...cfg,supervisor:p};setDoc(doc(db,"settings","main"),{supervisor:p},{merge:true}).catch(()=>{})};
+const waOpen=(ph,msg)=>{const a=document.createElement("a");a.href="https://wa.me/"+(ph?waNum(ph):"")+"?text="+encodeURIComponent(msg);a.target="_blank";a.rel="noopener";document.body.appendChild(a);a.click();a.remove()};
 /* ===== استيراد إكسل داخل وضع الطلب ===== */
 function importSheet(){
   open(`<h2>استيراد من إكسل</h2>
