@@ -194,13 +194,13 @@ try{
 }catch(e){$("#login").classList.remove("hide");$("#le").textContent="تأكد من بيانات Firebase في أول الملف."}
 if(auth)onAuthStateChanged(auth,u=>{
   if(u){$("#login").classList.add("hide");$("#app").classList.remove("hide");if(!started){started=true;start()}if(!me.name)askWho()}
-  else{if(unsub)unsub();unsub=null;started=false;first=true;$("#app").classList.add("hide");$("#login").classList.remove("hide")}
+  else{if(unsub)unsub();unsub=null;if(ordUnsub)ordUnsub();ordUnsub=null;lastOrd=null;started=false;first=true;$("#app").classList.add("hide");$("#login").classList.remove("hide")}
 });
 $("#lf").onsubmit=async e=>{e.preventDefault();$("#le").textContent="";
   try{await signInWithEmailAndPassword(auth,$("#em").value.trim(),$("#pw").value)}
   catch(err){$("#le").textContent="الإيميل أو كلمة السر غلط، جرّب تاني."}};
 function start(){
-  paintWho();onSnapshot(doc(db,"settings","main"),sn=>{if(sn.exists())cfg={...cfg,...sn.data()}},()=>{});
+  paintWho();onSnapshot(doc(db,"settings","main"),sn=>{if(sn.exists())cfg={...cfg,...sn.data()}},()=>{});setTimeout(()=>{if(!ordUnsub)watchOrders()},1500);
   unsub=onSnapshot(query(collection(db,"items"),orderBy("ts","desc")),snap=>{
     items=snap.docs.map(d=>({id:d.id,...d.data()}));
     if(!first)snap.docChanges().forEach(c=>{
@@ -211,6 +211,7 @@ function start(){
       if(c.type==="modified"&&d.status==="arrived")say(`✅ ${d.name} وصل`);
     });
     first=false;
+    setTimeout(applyOrders,0);
     $("#dot").classList.toggle("off",snap.metadata.fromCache);
     render();
   },err=>{$("#dot").classList.add("off");say("مش قادر أقرا البيانات: "+err.code)});
@@ -584,6 +585,7 @@ function renderOrd(){
   if(!ok.length)h+=`<div class="empty">${q?"مفيش صنف بالاسم ده.":"مفيش نواقص متبقية للطلب من "+esc(cur)+" 🎉"}</div>`;
   if(no.length)h+=`<div class="sect">مش موجود عند ${esc(cur)}</div>`+no.map(i=>`<div class="orow off" data-id="${i.id}">${nm(i)}<button class="a" data-o="undono">رجّعه</button></div>`).join("");
   if(done.length)h+=`<div class="sect">اتطلب دلوقتي من الشركة</div>`+done.map(i=>`<div class="orow done" data-id="${i.id}"><div class="onm">${esc(i.name)}<small>اتطلب من ${esc(i.supplier||"")}</small></div><button class="a" data-o="undoyes">تراجع</button></div>`).join("");
+  if(ok.length)h+=`<button class="btn big" data-o="link" style="background:var(--ord)">🔗 إرسال القايمة (${ok.length} صنف) بلينك للشركة</button>`;
   if(done.length)h+=`<button class="btn big" data-o="send">📤 إرسال الطلب (${done.length} صنف) على واتساب</button>`;
   $("#olist").innerHTML=h;
   $("#ocount").textContent=`باقي ${ok.length}`;
@@ -597,6 +599,7 @@ $("#chips").onclick=e=>{const b=e.target.closest("button");if(!b)return;
   cur=b.dataset.s;ls("curSup",cur);renderOrd()};
 $("#olist").onclick=async e=>{const b=e.target.closest("button[data-o]");if(!b)return;
   if(b.dataset.o==="send")return sendOrder();
+  if(b.dataset.o==="link")return sendLink();
   const id=b.closest(".orow").dataset.id,it=items.find(x=>x.id===id),o=b.dataset.o,r=doc(db,"items",id);
   if(o==="yes"){sess.add(id);await updateDoc(r,{status:"ordered",supplier:cur,orderedBy:me.name,orderedAt:serverTimestamp()})}
   if(o==="no")await updateDoc(r,{unav:[...(it.unav||[]),cur]});
@@ -656,6 +659,29 @@ function sendOrder(){
 }
 
 /* ===== أرقام الشركات والمشرف (مشتركة) ===== */
+/* ===== لينك تفاعلي للشركة ===== */
+function sendLink(){
+  const list=items.filter(i=>i.status==="needed"&&!(i.unav||[]).includes(cur)&&(okind==="all"||kindOf(i)===okind));
+  if(!list.length){say("مفيش أصناف للإرسال.");return}
+  const phones=()=>{try{return JSON.parse(ls("supPhones")||"{}")}catch(e){return{}}};
+  open(`<h2>لينك تفاعلي لـ ${esc(cur)}</h2>
+  <p class="meta">${list.length} صنف. مندوب الشركة هيفتح اللينك ويعلّم على كل صنف «موجود» أو «مش موجود»، والنتيجة بتظهر عندك لحظيًا.</p>
+  <input class="in" id="sp2" type="tel" dir="ltr" placeholder="رقم واتساب الشركة (اختياري، بيتحفظ)" value="${esc(getPhone(cur))}">
+  <button class="btn" id="sg">إنشاء اللينك وفتح واتساب</button><button class="a" id="sc">إلغاء</button>`);
+  $("#sc").onclick=close;
+  $("#sg").onclick=async()=>{
+    const p=$("#sp2").value.trim();if(p)setPhone(cur,p)
+    const tok=(crypto.randomUUID?crypto.randomUUID():String(Date.now())+Math.random().toString(36).slice(2)).replace(/-/g,"");
+    const its=list.map(i=>({id:i.id,name:i.name,qty:+i.qty||1,urgent:!!i.urgent,s:""}));
+    const wa=window.open("about:blank","_blank");
+    try{await Promise.race([setDoc(doc(db,"orders",tok),{supplier:cur,by:me.name,ts:serverTimestamp(),items:its,ap:{}}),new Promise((_,r)=>setTimeout(()=>r({code:"timeout"}),8000))])}
+    catch(e){if(wa)wa.close();wfail(e);return}
+    const url=location.origin+location.pathname.replace(/[^\/]*$/,"")+"s.html?o="+tok;
+    const msg=`السادة شركة ${cur}\nطلبية صيدلية أحمد نبيه (${its.length} صنف).\nمن فضلكم افتحوا اللينك وعلّموا على كل صنف موجود أو غير موجود:\n${url}`;
+    const u="https://wa.me/"+(p?waNum(p):"")+"?text="+encodeURIComponent(msg);
+    if(wa)wa.location=u;else location.href=u;
+    close();say("اتبعت اللينك. ردود الشركة هتظهر هنا تلقائي.")};
+}
 let cfg={supPhones:{},supervisor:""};
 const getPhone=n=>(cfg.supPhones&&cfg.supPhones[n])||(()=>{try{return JSON.parse(ls("supPhones")||"{}")[n]||""}catch(e){return""}})();
 const setPhone=(n,p)=>{try{const m=JSON.parse(ls("supPhones")||"{}");m[n]=p;ls("supPhones",JSON.stringify(m))}catch(e){}
@@ -663,6 +689,29 @@ const setPhone=(n,p)=>{try{const m=JSON.parse(ls("supPhones")||"{}");m[n]=p;ls("
 const getSupv=()=>cfg.supervisor||ls("supervisor")||"";
 const setSupv=p=>{ls("supervisor",p);cfg={...cfg,supervisor:p};setDoc(doc(db,"settings","main"),{supervisor:p},{merge:true}).catch(()=>{})};
 const waOpen=(ph,msg)=>{const a=document.createElement("a");a.href="https://wa.me/"+(ph?waNum(ph):"")+"?text="+encodeURIComponent(msg);a.target="_blank";a.rel="noopener";document.body.appendChild(a);a.click();a.remove()};
+let ordUnsub=null;
+let lastOrd=null;
+function watchOrders(){
+  ordUnsub=onSnapshot(query(collection(db,"orders"),orderBy("ts","desc"),limit(15)),snap=>{lastOrd=snap;applyOrders()},()=>{})
+}
+function applyOrders(){
+  const snap=lastOrd;if(!snap)return;
+  {
+    snap.docs.forEach(od=>{
+      const o=od.data();if(!o.items||od.metadata.hasPendingWrites)return;
+      const ap=o.ap||{};
+      o.items.forEach(x=>{
+        if(!x.s||ap[x.id])return;
+        const it=items.find(i=>i.id===x.id);if(!it)return;
+        const r=doc(db,"items",x.id),mark=()=>updateDoc(doc(db,"orders",od.id),{["ap."+x.id]:true}).catch(()=>{});
+        if(it.status!=="needed"){mark();return}
+        if(x.s==="yes"){updateDoc(r,{status:"ordered",supplier:o.supplier,orderedBy:"رد "+o.supplier,orderedAt:serverTimestamp()}).then(mark).catch(wfail);say(`✅ ${o.supplier}: ${it.name} موجود`)}
+        else if(x.s==="no"){if(!(it.unav||[]).includes(o.supplier))updateDoc(r,{unav:[...(it.unav||[]),o.supplier]}).then(mark).catch(wfail);else mark();say(`✖ ${o.supplier}: ${it.name} مش موجود`)}
+      })
+    })
+  }
+}
+
 /* ===== استيراد إكسل داخل وضع الطلب ===== */
 function importSheet(){
   open(`<h2>استيراد من إكسل</h2>

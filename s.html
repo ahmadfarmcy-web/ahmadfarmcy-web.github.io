@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>طلبية صيدلية أحمد نبيه</title>
+<style>
+:root{--ink:#17302b;--mute:#5f7570;--paper:#f2f5f3;--card:#fff;--line:#d9e2de;--brand:#0f6b5c;--ok:#2e7d4f;--bad:#b3261e}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,"Segoe UI",Tahoma,sans-serif;background:var(--paper);color:var(--ink)}
+header{background:var(--brand);color:#fff;padding:14px 16px;position:sticky;top:0;z-index:2}
+header h1{margin:0;font-size:18px}header p{margin:4px 0 0;font-size:13px;opacity:.9}
+.bar{height:6px;background:rgba(255,255,255,.3);border-radius:3px;margin-top:8px;overflow:hidden}.bar i{display:block;height:100%;background:#fff;width:0;transition:width .3s}
+main{max-width:640px;margin:0 auto;padding:12px 12px 80px}
+.row{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px}
+.row.yes{border-color:var(--ok);background:#eef8f1}.row.no{border-color:var(--bad);background:#fdf0ef}
+.nm{font-weight:700;font-size:16px}.nm small{display:block;color:var(--mute);font-weight:400;margin-top:2px}
+.btns{display:flex;gap:8px;margin-top:10px}
+button{flex:1;border:2px solid var(--line);background:#fff;border-radius:10px;padding:12px 6px;font-size:15px;font-weight:700;font-family:inherit;cursor:pointer}
+button.y.on{background:var(--ok);border-color:var(--ok);color:#fff}button.n.on{background:var(--bad);border-color:var(--bad);color:#fff}
+.msg{text-align:center;padding:40px 16px;color:var(--mute)}
+.done{position:fixed;bottom:0;inset-inline:0;background:#fff;border-top:1px solid var(--line);padding:10px 14px;text-align:center;font-weight:700;color:var(--ok)}
+</style>
+</head>
+<body>
+<header><h1 id="t">طلبية صيدلية أحمد نبيه</h1><p id="p">جارٍ التحميل…</p><div class="bar"><i id="b"></i></div></header>
+<main id="m"><div class="msg">جارٍ التحميل…</div></main>
+<div class="done" id="d" hidden>✅ تم الرد على كل الأصناف، شكرًا لحضرتكم</div>
+<script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {getFirestore,doc,onSnapshot,updateDoc,serverTimestamp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+const firebaseConfig={
+  apiKey:"AIzaSyBRa9TGiytW8L64T5NPkvG1vBqfPY7vT-8",
+  authDomain:"pharmacy-shortages.firebaseapp.com",
+  projectId:"pharmacy-shortages",
+  storageBucket:"pharmacy-shortages.firebasestorage.app",
+  messagingSenderId:"1074086208014",
+  appId:"1:1074086208014:web:c63f3c8d1d99b29fdc525f"
+};
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const tok=new URLSearchParams(location.search).get("o");
+if(!tok){$("#m").innerHTML='<div class="msg">اللينك غير صحيح.</div>'}
+else{
+  const db=getFirestore(initializeApp(firebaseConfig)),ref=doc(db,"orders",tok);
+  let items=[];
+  onSnapshot(ref,snap=>{
+    if(!snap.exists()){$("#m").innerHTML='<div class="msg">الطلبية غير موجودة أو انتهت.</div>';$("#p").textContent="";return}
+    const o=snap.data();items=o.items||[];
+    $("#t").textContent="طلبية صيدلية أحمد نبيه";
+    $("#p").textContent=`إلى: ${o.supplier} • ${items.length} صنف — علّم كل صنف: موجود أو مش موجود`;
+    render();
+  },e=>{$("#m").innerHTML='<div class="msg">تعذّر فتح الطلبية ('+esc(e.code||"")+').</div>'});
+  function render(){
+    $("#m").innerHTML=items.map((x,i)=>`<div class="row ${x.s==="yes"?"yes":x.s==="no"?"no":""}">
+      <div class="nm">${x.urgent?"🔥 ":""}${esc(x.name)}<small>الكمية: ${esc(x.qty||1)}</small></div>
+      <div class="btns"><button class="y ${x.s==="yes"?"on":""}" data-i="${i}" data-v="yes">✔ موجود</button><button class="n ${x.s==="no"?"on":""}" data-i="${i}" data-v="no">✖ مش موجود</button></div></div>`).join("");
+    const n=items.filter(x=>x.s).length;
+    $("#b").style.width=(items.length?n/items.length*100:0)+"%";
+    $("#d").hidden=!(items.length&&n===items.length);
+  }
+  $("#m").onclick=async e=>{
+    const b=e.target.closest("button[data-i]");if(!b)return;
+    const i=+b.dataset.i,v=b.dataset.v,next=items.map((x,k)=>k===i?{...x,s:x.s===v?"":v}:x);
+    items=next;render();
+    try{await updateDoc(ref,{items:next,updatedAt:serverTimestamp()})}catch(err){alert("تعذّر الحفظ، تأكد من الاتصال وجرّب تاني.")}
+  };
+}
+</script>
+</body>
+</html>
