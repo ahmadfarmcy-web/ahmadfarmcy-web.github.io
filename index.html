@@ -166,7 +166,7 @@ main{padding:12px 16px 110px;display:grid;gap:10px}
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {getAuth,signInWithEmailAndPassword,onAuthStateChanged,signOut} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import {initializeFirestore,persistentLocalCache,persistentMultipleTabManager,collection,addDoc,updateDoc,deleteDoc,doc,onSnapshot,query,orderBy,limit,setDoc,getDoc,serverTimestamp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {initializeFirestore,persistentLocalCache,persistentMultipleTabManager,collection,getDocs,addDoc,updateDoc,deleteDoc,doc,onSnapshot,query,orderBy,limit,setDoc,getDoc,serverTimestamp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 /* ====== الصق هنا بيانات Firebase (Project settings > General > pharmacy-web > Config) ====== */
 const firebaseConfig={
@@ -200,7 +200,7 @@ $("#lf").onsubmit=async e=>{e.preventDefault();$("#le").textContent="";
   try{await signInWithEmailAndPassword(auth,$("#em").value.trim(),$("#pw").value)}
   catch(err){$("#le").textContent="الإيميل أو كلمة السر غلط، جرّب تاني."}};
 function start(){
-  paintWho();onSnapshot(doc(db,"settings","main"),sn=>{if(sn.exists())cfg={...cfg,...sn.data()}},()=>{});setTimeout(()=>{if(!ordUnsub)watchOrders()},1500);
+  paintWho();onSnapshot(doc(db,"settings","main"),sn=>{if(sn.exists())cfg={...cfg,...sn.data()}},()=>{});setTimeout(()=>{if(!ordUnsub)watchOrders()},1500);loadCat();
   unsub=onSnapshot(query(collection(db,"items"),orderBy("ts","desc")),snap=>{
     items=snap.docs.map(d=>({id:d.id,...d.data()}));
     if(!first)snap.docChanges().forEach(c=>{
@@ -309,7 +309,7 @@ const tel=String(i.phone||"").replace(/[^\d+]/g,"");
     const deliver=isC&&stage==="arrived"?`<button class="a g" data-a="deliver">🤝 اتسلّم للعميل</button>`:"";
     const retBtn=stage==="ordered"?`<button class="a d" data-a="ret">📄 في الفاتورة ولم يصل</button>`:stage==="arrived"?`<button class="a d" data-a="ret">↩ مرتجع</button>`:"";
     const retAct=stage==="ret"?`<button class="a" data-a="photo">🧾 ${i.retPhoto?"صورة الفاتورة":"أضف صورة الفاتورة"}</button>`+(i.retState==="done"?`<button class="a" data-a="retdone">✏️ تعديل رقم الإشعار</button>`:`<button class="a g" data-a="retdone">✔ تم عمل مرتجع</button><button class="a" data-a="retnotify">📲 إشعار المورد والمشرف</button><button class="a" data-a="retcancel">إلغاء المرتجع</button>`):"";
-    const nfBtn=isC&&(stage==="needed"||stage==="ordered")?`<button class="a d" data-a="nf">❌ مش لاقيينه</button>`:"";
+    const nfBtn=(stage==="needed"||stage==="ordered")?`<button class="a d" data-a="nf">❌ ${isC?"مش لاقيينه":"غير متوافر"}</button>`:"";
     const arch=stage==="arrived"||stage==="nf"||(stage==="ret"&&i.retState==="done")?`<button class="a" data-a="archive">🗄 أرشفة</button>`:"";
     const unnf=stage==="nf"?`<button class="a" data-a="unnf">↩ رجّعه للطلب</button>`:"";
     const restore=stage==="archive"?`<button class="a" data-a="restore">↩ إرجاع من الأرشيف</button>`:"";
@@ -448,7 +448,7 @@ function sendReturns(){
     waOpen(getPhone(x),msg);close()};
 }
 function askNotFound(it){
-  open(`<h2>«${esc(it.name)}» مش لاقيينه</h2><p class="meta">هيتنقل لتبويب «مش لاقيينه»، وتقدر تبلّغ العميل وتؤرشفه بعدها.</p>
+  open(`<h2>«${esc(it.name)}» مش لاقيينه</h2><p class="meta">هيتنقل لتبويب «مش لاقيينه»${kindOf(it)==="customer"?"، وتقدر تبلّغ العميل وتؤرشفه بعدها":" (غير متوافر في السوق/الشركات)، وتقدر تؤرشفه بعدها"}.</p>
   <input class="in" id="nfn" placeholder="ملاحظة (اختياري)، مثلًا: مسحوب من السوق" value="${esc(it.nfNote||"")}"><button class="btn" id="nfok">تأكيد</button><button class="a" id="nfx">إلغاء</button>`);
   $("#nfx").onclick=close;
   $("#nfok").onclick=()=>{const n=$("#nfn").value.trim();close();updateDoc(doc(db,"items",it.id),{notfound:true,notfoundAt:serverTimestamp(),notfoundBy:me.name,nfNote:n}).catch(wfail)};
@@ -479,14 +479,31 @@ function sk(s){
   }
   return o.replace(/(.)\1+/g,"$1");
 }
-fetch("catalog.json").then(r=>r.json()).then(a=>{CAT=a.map(x=>({n:x[0],p:x[1],k:x[2],l:x[0].toLowerCase(),s:sk(x[0])}))}).catch(()=>{});
+let catLvl=0;
+function setCat(a,lvl){if(lvl<catLvl)return;catLvl=lvl;CAT=a.map(x=>{const l=String(x[0]).toLowerCase();return{n:x[0],p:x[1],k:x[2],l,w:l.split(/[\s\-\/]+/),s:sk(x[0])}})}
+fetch("catalog.json").then(r=>r.json()).then(a=>setCat(a,1)).catch(()=>{});
+async function loadCat(){
+  try{
+    const m=await getDoc(doc(db,"catalog","meta"));
+    if(!m.exists())return;
+    const md=m.data(),v=md.v;let cached=null;
+    try{cached=JSON.parse(localStorage.getItem("catv")||"null")}catch(e){}
+    if(cached&&cached.v===v&&cached.d){setCat(cached.d,2);return}
+    const sn=await getDocs(collection(db,"catalog"));
+    const n=+md.chunks||0,parts=[];
+    sn.forEach(d=>{const mm=/^c(\d+)$/.exec(d.id);if(mm&&+mm[1]<n)parts.push([+mm[1],d.data().d])});
+    parts.sort((a,b)=>a[0]-b[0]);
+    const arr=[];parts.forEach(p=>{try{arr.push(...JSON.parse(p[1]))}catch(e){}});
+    if(arr.length>100){setCat(arr,2);try{localStorage.setItem("catv",JSON.stringify({v,d:arr}))}catch(e){}}
+  }catch(e){}
+}
 function suggest(q){
   q=q.trim().toLowerCase();if(q.length<2||!CAT.length)return[];
   const qs=sk(q),r=[];
   for(const c of CAT){
     let sc=99;
     if(c.l.startsWith(q))sc=0;
-    else if(c.l.split(/[\s\-\/]+/).some(w=>w.startsWith(q)))sc=1;
+    else if(c.w.some(w=>w.startsWith(q)))sc=1;
     else if(qs.length>=2&&c.s.startsWith(qs))sc=2;
     else if(c.l.includes(q))sc=3;
     else if(qs.length>=3&&c.s.includes(qs))sc=4;
@@ -500,7 +517,7 @@ function attachSuggest(inp,onpick){
   const draw=()=>{
     const L=suggest(inp.value);
     if(!L.length){box.innerHTML="";return}
-    box.innerHTML=L.map((c,i)=>`<button type="button" class="sgi" data-i="${i}"><span dir="auto">${esc(c.n)}</span><small>${c.p?c.p+" ج":""} · رصيد ${c.k}</small></button>`).join("");
+    box.innerHTML=L.map((c,i)=>`<button type="button" class="sgi" data-i="${i}"><span dir="auto">${esc(c.n)}</span><small>${c.p?c.p+" ج":""}${c.k!=null?" · رصيد "+c.k:""}</small></button>`).join("");
     box.onpointerdown=e=>{const b=e.target.closest(".sgi");if(!b)return;e.preventDefault();inp.value=L[b.dataset.i].n;box.innerHTML="";inp.dispatchEvent(new Event("input"));onpick&&onpick()};
   };
   inp.addEventListener("input",draw);
