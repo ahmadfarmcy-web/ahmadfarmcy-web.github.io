@@ -598,7 +598,7 @@ function renderOrd(){
   const ok=need.filter(i=>!(i.unav||[]).includes(cur)).sort((x,y)=>((kindOf(y)==="customer"?1:0)-(kindOf(x)==="customer"?1:0))||((y.urgent?1:0)-(x.urgent?1:0))),no=need.filter(i=>(i.unav||[]).includes(cur));
   const done=items.filter(i=>sess.has(i.id)&&i.status==="ordered");
   const nm=i=>{const bits=["الكمية "+esc(i.qty||1)];if(kindOf(i)==="customer"&&i.customer)bits.push("العميل: "+esc(i.customer));if(i.note)bits.push(esc(i.note));if((i.unav||[]).length&&!(i.unav||[]).includes(cur))bits.push("مش موجود عند "+esc(i.unav.join("، ")));return `<div class="onm">${i.urgent?"🔥 ":""}${kindOf(i)==="customer"?"👤 ":""}${esc(i.name)}${bits.length?`<small>${bits.join(" • ")}</small>`:""}</div>`};
-  let h=ok.map(i=>`<div class="orow" data-id="${i.id}">${nm(i)}<button class="ob yes" data-o="yes" aria-label="تم الطلب">✔</button><button class="ob no" data-o="no" aria-label="مش موجود">✖</button></div>`).join("");
+  let h=ok.map(i=>`<div class="orow" data-id="${i.id}">${nm(i)}<button class="ob yes" data-o="yes" aria-label="تم الطلب">✔</button></div>`).join("");
   if(!ok.length)h+=`<div class="empty">${q?"مفيش صنف بالاسم ده.":"مفيش نواقص متبقية للطلب من "+esc(cur)+" 🎉"}</div>`;
   if(no.length)h+=`<div class="sect">مش موجود عند ${esc(cur)}</div>`+no.map(i=>`<div class="orow off" data-id="${i.id}">${nm(i)}<button class="a" data-o="undono">رجّعه</button></div>`).join("");
   if(done.length)h+=`<div class="sect">اتطلب دلوقتي من الشركة</div>`+done.map(i=>`<div class="orow done" data-id="${i.id}"><div class="onm">${esc(i.name)}<small>اتطلب من ${esc(i.supplier||"")}</small></div><button class="a" data-o="undoyes">تراجع</button></div>`).join("");

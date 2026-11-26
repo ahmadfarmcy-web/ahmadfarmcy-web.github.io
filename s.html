@@ -18,6 +18,7 @@ main{max-width:640px;margin:0 auto;padding:12px 12px 80px}
 .btns{display:flex;gap:8px;margin-top:10px}
 button{flex:1;border:2px solid var(--line);background:#fff;border-radius:10px;padding:12px 6px;font-size:15px;font-weight:700;font-family:inherit;cursor:pointer}
 button.y.on{background:var(--ok);border-color:var(--ok);color:#fff}button.n.on{background:var(--bad);border-color:var(--bad);color:#fff}
+.sect{margin:18px 4px 8px;font-size:14px;color:var(--mute)}
 .msg{text-align:center;padding:40px 16px;color:var(--mute)}
 .done{position:fixed;bottom:0;inset-inline:0;background:#fff;border-top:1px solid var(--line);padding:10px 14px;text-align:center;font-weight:700;color:var(--ok)}
 </style>
@@ -48,16 +49,20 @@ else{
     if(!snap.exists()){$("#m").innerHTML='<div class="msg">الطلبية غير موجودة أو انتهت.</div>';$("#p").textContent="";return}
     const o=snap.data();items=o.items||[];
     $("#t").textContent="طلبية صيدلية أحمد نبيه";
-    $("#p").textContent=`إلى: ${o.supplier} • ${items.length} صنف — علّم كل صنف: موجود أو مش موجود`;
+    $("#p").textContent=`إلى: ${o.supplier} • ${items.length} صنف — اضغط ✔ على الأصناف الموجودة عندكم`;
     render();
   },e=>{$("#m").innerHTML='<div class="msg">تعذّر فتح الطلبية ('+esc(e.code||"")+').</div>'});
   function render(){
-    $("#m").innerHTML=items.map((x,i)=>`<div class="row ${x.s==="yes"?"yes":x.s==="no"?"no":""}">
+    const row=(x,i)=>`<div class="row ${x.s==="yes"?"yes":""}">
       <div class="nm">${x.urgent?"🔥 ":""}${esc(x.name)}<small>الكمية: ${esc(x.qty||1)}</small></div>
-      <div class="btns"><button class="y ${x.s==="yes"?"on":""}" data-i="${i}" data-v="yes">✔ موجود</button><button class="n ${x.s==="no"?"on":""}" data-i="${i}" data-v="no">✖ مش موجود</button></div></div>`).join("");
-    const n=items.filter(x=>x.s).length;
+      <div class="btns"><button class="y ${x.s==="yes"?"on":""}" data-i="${i}" data-v="yes">${x.s==="yes"?"✔ موجود (اضغط للتراجع)":"✔ موجود"}</button></div></div>`;
+    const todo=[],done=[];
+    items.forEach((x,i)=>(x.s==="yes"?done:todo).push(row(x,i)));
+    $("#m").innerHTML=(todo.length?todo.join(""):'<div class="msg">خلّصت كل الأصناف ✔</div>')+(done.length?`<h3 class="sect">تم الرد: موجود (${done.length})</h3>`+done.join(""):"");
+    const n=done.length;
     $("#b").style.width=(items.length?n/items.length*100:0)+"%";
-    $("#d").hidden=!(items.length&&n===items.length);
+    $("#d").textContent=`✅ تم تعليم ${n} من ${items.length} صنف. شكرًا لحضرتكم`;
+    $("#d").hidden=!n;
   }
   $("#m").onclick=async e=>{
     const b=e.target.closest("button[data-i]");if(!b)return;
