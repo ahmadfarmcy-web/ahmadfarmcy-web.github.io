@@ -73,7 +73,7 @@ main{padding:12px 16px 110px;display:grid;gap:10px}
 .tools{grid-template-columns:repeat(12,1fr);align-items:stretch}
 #ordmode{grid-column:span 5;order:1}#q{grid-column:span 7;order:2}#pend{grid-column:1/-1;order:3}
 .tabs{grid-column:1/-1;order:4}#kindf{grid-column:span 6;order:5}#dayf{grid-column:span 6;order:6}
-.chips,.oq,#okf,.ordb{max-width:960px;margin-inline:auto;width:100%}
+.chips,.oq,#okf,#odf,.ordb{max-width:960px;margin-inline:auto;width:100%}
 }
 .ord{position:fixed;inset:0;background:var(--paper);z-index:15;overflow:auto;padding-top:env(safe-area-inset-top)}
 .ordh{display:flex;gap:10px;align-items:center;padding:12px 16px;background:var(--ink);color:#fff;position:sticky;top:0;z-index:2;font-size:18px}
@@ -92,7 +92,7 @@ main{padding:12px 16px 110px;display:grid;gap:10px}
 .orow.off{opacity:.6}.orow.done{border-color:var(--ok);background:#eef7f1}
 .sect{font-size:14px;color:var(--mute);margin:12px 2px 0}
 .big{width:100%;padding:14px;font-size:17px}
-.tab{font-size:14px}.sect.old{color:var(--need);font-weight:700}#dayf{grid-template-columns:repeat(3,1fr)}
+.tab{font-size:14px}.sect.old{color:var(--need);font-weight:700}#dayf,#odf{grid-template-columns:repeat(4,1fr)}#dayf button,#odf button{display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.25;padding:8px 2px;font-size:14px}#dayf small,#odf small{font-size:11px;opacity:.8;font-weight:400}
 .item.urgent{border-inline-start-color:var(--bad)!important;background:#fff6f5}
 .fold{width:100%;padding:14px;font-weight:700;color:var(--need);border-color:var(--need);background:#fff}
 
@@ -162,7 +162,7 @@ main{padding:12px 16px 110px;display:grid;gap:10px}
       <button class="tab" role="tab" data-t="archive">أرشيف<b id="c6">0</b></button>
     </div>
     <div class="seg" id="kindf" style="grid-template-columns:repeat(3,1fr)"><button data-k="all">الكل</button><button data-k="stock">📦 نواقص المخزن</button><button data-k="customer">👤 طلبات العملاء</button></div>
-    <div class="seg" id="dayf"><button data-d="all">كل الأيام</button><button data-d="0">النهاردة</button><button data-d="1">إمبارح</button></div>
+    <div class="seg" id="dayf"></div>
   </div>
   <main id="list"></main>
   <button class="fab" id="add">+ صنف ناقص</button>
@@ -173,6 +173,7 @@ main{padding:12px 16px 110px;display:grid;gap:10px}
   <div class="chips" id="chips"></div>
   <div class="oq" style="display:flex;gap:8px"><input class="in" id="oq" type="search" placeholder="ابحث عن صنف" style="flex:1"><button class="a" id="oimp" style="white-space:nowrap">📥 استيراد إكسل</button></div>
   <div class="seg" id="okf" style="grid-template-columns:repeat(3,1fr);padding:8px 16px 0"><button data-k="all">الكل</button><button data-k="stock">📦 المخزن</button><button data-k="customer">👤 العملاء</button></div>
+  <div class="seg" id="odf" style="padding:8px 16px 0"></div>
   <div class="ordb" id="olist"></div>
 </div>
 
@@ -268,12 +269,20 @@ function askWho(){
 $("#tabs").onclick=e=>{const b=e.target.closest(".tab");if(!b)return;tab=b.dataset.t;render()};
 $("#q").oninput=render;
 
+const BD=ms=>{const d=new Date(ms-288e5);d.setHours(0,0,0,0);return d.getTime()};
+const bdAge=ms=>Math.round((BD(Date.now())-BD(ms))/864e5);
+const tmOf=v=>v&&v.toDate?v.toDate().getTime():(typeof v==="number"?v:0);
+function dayBtns(){
+  const base=BD(Date.now());
+  const lab=n=>{const d=new Date(base-n*864e5+36e5*12);return d.toLocaleDateString("en-GB",{day:"2-digit",month:"2-digit"})};
+  return [["0","اليوم"],["1","أمس"],["2","أول أمس"]].map(([k,t])=>`<button data-d="${k}"><span>${t}</span><small>${lab(+k)}</small></button>`).join("")+`<button data-d="all"><span>كل الأيام</span></button>`;
+}
 function render(){renderOrd();
   const q=norm(String($("#q").value||"").replace(/[٠-٩]/g,d=>"٠١٢٣٤٥٦٧٨٩".indexOf(d)));
   const K=i=>kindf==="all"||kindOf(i)===kindf;
   const by=s=>items.filter(i=>i.status===s&&K(i));
   const tsMs=v=>v&&v.toDate?v.toDate().getTime():(typeof v==="number"?v:0);
-  const dStart=ms=>{const d=new Date(ms);d.setHours(0,0,0,0);return d.getTime()};
+  const dStart=BD;
   const t0=dStart(Date.now());
   const msOf=i=>(i.archived&&tsMs(i.archivedAt))||(i.delivered&&tsMs(i.deliveredAt))||(i.status==="arrived"&&tsMs(i.arrivedAt))||tsMs(i.ts)||Date.now();
   const ageOf=i=>Math.round((t0-dStart(msOf(i)))/864e5);
@@ -290,6 +299,7 @@ function render(){renderOrd();
   $("#pend").classList.toggle("hide",!pend.length);$("#pend").textContent=`📞 ${pend.length} عميل لازم نبلّغه (وصل صنفه أو الصنف مش متوفر)`;
   document.querySelectorAll("#kindf button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.k===kindf));
   $("#dayf").classList.toggle("hide",!!q||tab==="archive"||tab==="nf"||tab==="ret");
+  $("#dayf").innerHTML=dayBtns();
   document.querySelectorAll("#dayf button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.d===dayf));
   const qd=String($("#q").value||"").replace(/[٠-٩]/g,d=>"٠١٢٣٤٥٦٧٨٩".indexOf(d)).replace(/\D/g,"");
   const ORD=["needed","ordered","arrived","ret","nf","archive"],SN={needed:"📝 مسجّل",ordered:"📦 اتطلب",arrived:"✅ وصل",ret:"↩ مرتجع",nf:"❌ مش لاقيينه",archive:"🗄 أرشيف"};
@@ -312,7 +322,7 @@ function render(){renderOrd();
   const srTop=q?`<div class="meta" style="margin:4px 2px 0">🔎 ${list.length} نتيجة في كل المراحل</div>`:"";
   const retTop=!q&&tab==="ret"&&items.some(i=>i.retState==="pending")?`<button class="btn big" data-sendret="1" style="background:var(--ord)">📤 رسالة مرتجعات لشركة</button>`:"";
   L.innerHTML=srTop+retTop+list.map(i=>{
-    const ag=ageOf(i),lb=q?SN[stg(i)]:tab==="ret"?(i.retState==="done"?"✅ تم عمل مرتجع":"↩ لازم يتعمل مرتجع"):U(i)?"🔥 مستعجل":tab==="archive"?dateTxt(i).split(" ").slice(0,-1).join(" "):ag<=0?"النهاردة":ag===1?"إمبارح":(tab==="arrived"?"أقدم":"أقدم — لسه مستني");
+    const ag=ageOf(i),lb=q?SN[stg(i)]:tab==="ret"?(i.retState==="done"?"✅ تم عمل مرتجع":"↩ لازم يتعمل مرتجع"):U(i)?"🔥 مستعجل":tab==="archive"?dateTxt(i).split(" ").slice(0,-1).join(" "):ag<=0?"النهاردة":ag===1?"أمس":ag===2?"أول أمس":(tab==="arrived"?"أقدم":"أقدم — لسه مستني");
     const head=lb!==last?`<div class="sect${!q&&ag>1&&!U(i)&&tab!=="archive"&&tab!=="arrived"?" old":""}">${lb}</div>`:"";last=lb;
     const when=i.ts?.toDate?i.ts.toDate().toLocaleDateString("ar-EG",{day:"numeric",month:"short"}):"";
     const isC=kindOf(i)==="customer",stage=stg(i);
@@ -618,14 +628,18 @@ let cur=ls("curSup")||sups()[0];
 function renderOrd(){
   if(!ordOpen)return;
   const S=sups();if(!S.includes(cur))cur=S[0];
+  $("#odf").innerHTML=dayBtns();document.querySelectorAll("#odf button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.d===oday));
   document.querySelectorAll("#okf button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.k===okind));
   $("#chips").innerHTML=S.map(x=>`<button class="chip" data-s="${esc(x)}" aria-pressed="${x===cur}">${esc(x)}</button>`).join("")+`<button class="chip" data-add="1">+ شركة</button>`;
   const q=norm($("#oq").value||"");
-  const need=items.filter(i=>i.status==="needed"&&(!q||norm(i.name).includes(q))&&(okind==="all"||kindOf(i)===okind));
-  const ok=need.filter(i=>!(i.unav||[]).includes(cur)).sort((x,y)=>((kindOf(y)==="customer"?1:0)-(kindOf(x)==="customer"?1:0))||((y.urgent?1:0)-(x.urgent?1:0))),no=need.filter(i=>(i.unav||[]).includes(cur));
+  const need=items.filter(i=>i.status==="needed"&&(!q||norm(i.name).includes(q))&&(okind==="all"||kindOf(i)===okind)&&(oday==="all"||bdAge(tmOf(i.ts)||Date.now())===+oday));
+  const ok=need.filter(i=>!(i.unav||[]).includes(cur)).sort((x,y)=>(bdAge(tmOf(x.ts)||Date.now())-bdAge(tmOf(y.ts)||Date.now()))||((kindOf(y)==="customer"?1:0)-(kindOf(x)==="customer"?1:0))||((y.urgent?1:0)-(x.urgent?1:0))||((tmOf(y.ts)||Date.now())-(tmOf(x.ts)||Date.now()))),no=need.filter(i=>(i.unav||[]).includes(cur));
   const done=items.filter(i=>sess.has(i.id)&&i.status==="ordered");
   const nm=i=>{const bits=["الكمية "+esc(i.qty||1)];if(kindOf(i)==="customer"&&i.customer)bits.push("العميل: "+esc(i.customer));if(i.note)bits.push(esc(i.note));if((i.unav||[]).length&&!(i.unav||[]).includes(cur))bits.push("مش موجود عند "+esc(i.unav.join("، ")));return `<div class="onm">${i.urgent?"🔥 ":""}${kindOf(i)==="customer"?"👤 ":""}${esc(i.name)}${bits.length?`<small>${bits.join(" • ")}</small>`:""}</div>`};
-  let h=ok.map(i=>`<div class="orow" data-id="${i.id}">${nm(i)}<button class="ob yes" data-o="yes" aria-label="تم الطلب">✔</button></div>`).join("");
+  let lastAge=null;
+  const dayLbl=a=>{const d=new Date(BD(Date.now())-a*864e5+432e5).toLocaleDateString("en-GB",{day:"2-digit",month:"2-digit"});return (a<=0?"اليوم":a===1?"أمس":a===2?"أول أمس":"أقدم")+" — "+d};
+  let h=ok.map(i=>{const a=bdAge(tmOf(i.ts)||Date.now()),hd=(oday==="all"&&a!==lastAge)?`<div class="sect${a>1?" old":""}">${dayLbl(a)}</div>`:"";lastAge=a;
+    return hd+`<div class="orow" data-id="${i.id}">${nm(i)}<button class="ob yes" data-o="yes" aria-label="تم الطلب">✔</button></div>`}).join("");
   if(!ok.length)h+=`<div class="empty">${q?"مفيش صنف بالاسم ده.":"مفيش نواقص متبقية للطلب من "+esc(cur)+" 🎉"}</div>`;
   if(no.length)h+=`<div class="sect">مش موجود عند ${esc(cur)}</div>`+no.map(i=>`<div class="orow off" data-id="${i.id}">${nm(i)}<button class="a" data-o="undono">رجّعه</button></div>`).join("");
   if(done.length)h+=`<div class="sect">اتطلب دلوقتي من الشركة</div>`+done.map(i=>`<div class="orow done" data-id="${i.id}"><div class="onm">${esc(i.name)}<small>اتطلب من ${esc(i.supplier||"")}</small></div><button class="a" data-o="undoyes">تراجع</button></div>`).join("");
@@ -795,8 +809,9 @@ function importSheet(){
 $("#oimp").onclick=importSheet;
 const kindOf=i=>i.kind||((i.customer||i.phone)?"customer":"stock");
 const showOld={needed:false,ordered:false};
-let dayf="all",kindf="all",okind="all";
+let dayf="0",kindf="all",okind="all",oday="all";
 $("#kindf").onclick=e=>{const b=e.target.closest("button");if(!b)return;kindf=b.dataset.k;render()};
+$("#odf").onclick=e=>{const b=e.target.closest("button");if(!b)return;oday=b.dataset.d;renderOrd()};
 $("#okf").onclick=e=>{const b=e.target.closest("button");if(!b)return;okind=b.dataset.k;renderOrd()};
 $("#dayf").onclick=e=>{const b=e.target.closest("button");if(!b)return;dayf=b.dataset.d;render()};
 
