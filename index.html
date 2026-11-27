@@ -111,6 +111,21 @@ main{padding:12px 16px 110px;display:grid;gap:10px}
 .sline{border-radius:8px;padding:7px 10px;font-size:14px;font-weight:700;background:#fff4e0;color:var(--need)}
 .sline.s-ord{background:#e8f0fb;color:var(--ord)}.sline.s-ok{background:#e9f6ee;color:var(--ok)}.sline.s-bad{background:#fdecea;color:var(--bad)}.sline.s-gray{background:#eef2f0;color:var(--mute)}
 .item.nf,.item.ret{border-inline-start-color:var(--bad)}
+
+.dbt{position:fixed;inset:0;background:var(--paper);z-index:15;overflow:auto;padding-top:env(safe-area-inset-top)}
+.dbt .dtop,.dbt .lst{max-width:960px;margin-inline:auto;width:100%;padding-inline:16px}
+.dbt .sum{display:flex;gap:10px;flex-wrap:wrap;padding-top:12px;font-size:15px}
+.dbt .sum b{font-size:20px}
+.dbt .row2{display:flex;gap:8px;padding-top:10px;flex-wrap:wrap}
+.dbt .lst{display:grid;gap:8px;padding-top:10px;padding-bottom:60px}
+.dc{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;display:flex;gap:10px;align-items:center}
+.dc.sent{opacity:.55}
+.dc .nm{font-weight:700;font-size:16px}.dc .am{font-size:18px;font-weight:800;color:var(--bad)}
+.dc .ph{font-size:13px;color:var(--mute);direction:ltr;text-align:right}
+.dc .inf{flex:1;min-width:0}
+.sm{background:var(--ord);color:#fff;border-radius:12px;padding:12px 14px;font-weight:700;text-decoration:none;white-space:nowrap;font-size:15px}
+.dc .bt{display:flex;flex-direction:column;gap:6px}
+.wa{background:#1fa855;color:#fff;border-radius:12px;padding:12px 14px;font-weight:700;text-decoration:none;white-space:nowrap;border:0;font-size:15px}
 </style>
 </head>
 <body>
@@ -135,6 +150,7 @@ main{padding:12px 16px 110px;display:grid;gap:10px}
   </header>
   <div class="tools">
     <button class="btn big" id="ordmode">📞 وضع الطلب من شركة</button>
+    <button class="btn big" id="dbtmode" style="background:var(--need)">💬 مطالبة العملاء</button>
     <button class="a hide" id="pend" style="border-color:var(--bad);color:var(--bad);font-weight:700;padding:12px"></button>
     <input class="in" id="q" type="search" placeholder="ابحث بالصنف أو اسم العميل أو رقم تليفونه">
     <div class="tabs" role="tablist" id="tabs">
@@ -158,6 +174,17 @@ main{padding:12px 16px 110px;display:grid;gap:10px}
   <div class="oq" style="display:flex;gap:8px"><input class="in" id="oq" type="search" placeholder="ابحث عن صنف" style="flex:1"><button class="a" id="oimp" style="white-space:nowrap">📥 استيراد إكسل</button></div>
   <div class="seg" id="okf" style="grid-template-columns:repeat(3,1fr);padding:8px 16px 0"><button data-k="all">الكل</button><button data-k="stock">📦 المخزن</button><button data-k="customer">👤 العملاء</button></div>
   <div class="ordb" id="olist"></div>
+</div>
+
+<div id="dbt" class="dbt hide">
+  <div class="ordh"><button class="a" id="dback">← رجوع</button><b>مطالبة العملاء</b><span id="dwhen"></span></div>
+  <div class="dtop">
+    <div class="sum" id="dsum"></div>
+    <div class="row2"><button class="a" id="dimp">📥 رفع تقرير المدينين</button><button class="a" id="dtpl">✏️ نص الرسالة</button><button class="a" id="dreset">↺ تصفير علامات الإرسال</button></div>
+    <div class="row2"><input class="in" id="dq" type="search" placeholder="ابحث بالاسم أو الرقم" style="flex:1;min-width:180px"><input class="in" id="dmin" type="number" inputmode="decimal" placeholder="أقل مبلغ" style="width:110px"></div>
+    <div class="seg" id="dflt" style="grid-template-columns:repeat(3,1fr);margin-top:10px"><button data-f="all">الكل</button><button data-f="todo">لسه ما اتبعتش</button><button data-f="nophone">بدون رقم</button></div>
+  </div>
+  <div class="lst" id="dlist"></div>
 </div>
 
 <div id="toast" class="hide" role="status"></div>
@@ -314,7 +341,7 @@ const tel=String(i.phone||"").replace(/[^\d+]/g,"");
     const unnf=stage==="nf"?`<button class="a" data-a="unnf">↩ رجّعه للطلب</button>`:"";
     const restore=stage==="archive"?`<button class="a" data-a="restore">↩ إرجاع من الأرشيف</button>`:"";
     return head+`<article class="item ${i.status}${i.urgent?" urgent":""}${stage==="nf"?" nf":""}${stage==="ret"?" ret":""}" data-id="${i.id}">
-      <div class="top"><div class="nm">${i.urgent?"🔥 ":""}${kindOf(i)==="customer"?"👤 ":""}${esc(i.name)}</div><div class="qty">${esc(i.qty||1)}</div></div>
+      <div class="dtop"><div class="nm">${i.urgent?"🔥 ":""}${kindOf(i)==="customer"?"👤 ":""}${esc(i.name)}</div><div class="qty">${esc(i.qty||1)}</div></div>
       <div class="meta">${esc(i.by||"")} • شيفت ${esc(i.shift||"")} ${when?"• "+when:""}${i.customer||i.phone?`<br>العميل: ${esc(i.customer||"")} <span dir="ltr">${esc(i.phone||"")}</span>${i.notified?` <b class="flag" style="color:var(--ok)">✔ اتبلّغ</b>`:""}`:""}${i.note?`<br>${esc(i.note)}`:""}</div>
       ${stepper}${ordLine}
       <div class="acts">
@@ -651,7 +678,7 @@ function pendSheet(){
   if(!list.length){say("مفيش عملاء مستنيين.");return}
   open(`<h2>عملاء لازم نبلّغهم</h2>`+list.map(i=>{
     const tel=String(i.phone||"").replace(/[^\d+]/g,""),t=i.notfound?`أهلاً ${i.customer||""}، للأسف الصنف «${i.name}» غير متوفر حاليًا عند الموردين، وهنبلغ حضرتك لو توفّر. صيدلية أحمد نبيه.`:`أهلاً ${i.customer||""}، الصنف «${i.name}» وصل صيدلية أحمد نبيه. تشرفنا بزيارتك.`;
-    return `<div class="item arrived" data-id="${i.id}"><div class="top"><div class="nm">${esc(i.name)}</div></div>
+    return `<div class="item arrived" data-id="${i.id}"><div class="dtop"><div class="nm">${esc(i.name)}</div></div>
       <div class="meta">${esc(i.customer||"")} <span dir="ltr">${esc(i.phone||"")}</span></div>
       <div class="acts">${tel?`<a class="a" href="tel:${tel}">📞 اتصال</a><a class="a" href="sms:${tel}?body=${encodeURIComponent(t)}">✉️ رسالة</a><a class="a" target="_blank" rel="noopener" href="https://wa.me/${waNum(i.phone)}?text=${encodeURIComponent(t)}">واتساب</a>`:""}<button class="a g" data-p="${i.id}">✔ اتبلّغ</button></div></div>`}).join("")+`<button class="a" id="px">إغلاق</button>`);
   $("#px").onclick=close;
@@ -773,6 +800,122 @@ $("#kindf").onclick=e=>{const b=e.target.closest("button");if(!b)return;kindf=b.
 $("#okf").onclick=e=>{const b=e.target.closest("button");if(!b)return;okind=b.dataset.k;renderOrd()};
 $("#dayf").onclick=e=>{const b=e.target.closest("button");if(!b)return;dayf=b.dataset.d;render()};
 
+
+/* ===== مطالبة العملاء (تقرير المدينين من فارما فلاي -> رسائل واتساب) ===== */
+const DEF_TPL="السلام عليكم أستاذ/ة {الاسم}، رصيد حضرتك في صيدلية أحمد نبيه {المبلغ} جنيه. برجاء السداد في أقرب وقت. شكرًا لحضرتك 🌷";
+const dget=(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}};
+const dset=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
+let PH=dget("dbtph",{});let D=dget("dbt",{ts:0,rows:[],sent:{}}),dTpl=dget("dbtpl",DEF_TPL),dFlt="all";
+const a2e=t=>String(t).replace(/[٠-٩]/g,c=>"٠١٢٣٤٥٦٧٨٩".indexOf(c)).replace(/[۰-۹]/g,c=>"۰۱۲۳۴۵۶۷۸۹".indexOf(c));
+function splitCust(raw){
+  let t=a2e(raw||"").replace(/(\d)[\s\-.]+(?=\d)/g,"$1");
+  const m=t.match(/(?:\+?20|0)?(1[0125]\d{8})/);
+  const phone=m?"0"+m[1]:"";
+  if(m)t=t.replace(m[0]," ");
+  const name=t.replace(/\s+/g," ").trim();
+  return {name,phone};
+}
+const cleanN=n=>n.replace(/^(الأستاذ|الاستاذ|أستاذ|استاذ|الدكتور|دكتور|د\/|أ\/|ا\/|م\/)\s*/,"").trim()||n;
+const money=n=>{const r=Math.round(n*100)/100;return r.toLocaleString("en-US",{maximumFractionDigits:2})};
+function waLink(r){
+  const txt=dTpl.replace(/\{الاسم\}/g,cleanN(r.name)).replace(/\{المبلغ\}/g,money(r.amt));
+  return "https://wa.me/2"+r.phone+"?text="+encodeURIComponent(txt);
+}
+function smsLink(r){
+  const txt=dTpl.replace(/\{الاسم\}/g,cleanN(r.name)).replace(/\{المبلغ\}/g,money(r.amt));
+  return "sms:+2"+r.phone+"?&body="+encodeURIComponent(txt);
+}
+function renderDbt(){
+  const q=a2e($("#dq").value||"").trim().toLowerCase(),mn=parseFloat($("#dmin").value)||0.01;
+  const all=D.rows.filter(r=>r.amt>=mn);
+  const tot=all.reduce((a,r)=>a+r.amt,0),sent=all.filter(r=>D.sent[r.id]).length,nop=all.filter(r=>!r.phone).length;
+  $("#dwhen").textContent=D.ts?new Date(D.ts).toLocaleDateString("ar-EG",{day:"numeric",month:"long"}):"";
+  $("#dsum").innerHTML=D.rows.length?`<span>عدد العملاء <b>${all.length}</b></span><span>الإجمالي <b>${money(tot)}</b> جنيه</span><span>اتبعت <b>${sent}</b></span>${nop?`<span style="color:var(--bad)">بدون رقم <b>${nop}</b></span>`:""}`:"";
+  let L=all.filter(r=>dFlt==="todo"?!D.sent[r.id]:dFlt==="nophone"?!r.phone:true);
+  if(q)L=L.filter(r=>(r.name+" "+r.phone+" "+r.id).toLowerCase().includes(q));
+  L.sort((a,b)=>b.amt-a.amt);
+  document.querySelectorAll("#dflt button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.f===dFlt));
+  $("#dlist").innerHTML=!D.rows.length?`<p class="meta" style="padding:20px 0">لسه ما فيش تقرير. اضغط «📥 رفع تقرير المدينين» واختار ملف الإكسل من فارما فلاي (أعمدة: كود العميل، اسم العميل، قيمة الدين).</p>`:
+   L.map(r=>`<div class="dc ${D.sent[r.id]?"sent":""}"><div class="inf"><div class="nm">${esc(r.name)}</div><div class="ph">${r.phone?esc(r.phone):"مفيش رقم"}</div><div class="am">${money(r.amt)} جنيه</div></div>${r.phone?`<div class="bt"><a class="wa" data-id="${esc(r.id)}" href="${waLink(r)}" target="_blank" rel="noopener">${D.sent[r.id]?"✔ اتبعتت":"📲 واتساب"}</a><a class="sm" data-id="${esc(r.id)}" href="${smsLink(r)}">✉️ SMS</a></div>`:`<button class="a" data-ph="${esc(r.id)}">➕ رقم</button>`}</div>`).join("")||`<p class="meta" style="padding:20px 0">مفيش نتائج.</p>`;
+}
+async function importDebts(f){
+  if(!window.XLSX)await new Promise((ok,no)=>{const sc=document.createElement("script");sc.src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";sc.onload=ok;sc.onerror=no;document.head.appendChild(sc)});
+  const wb=XLSX.read(await f.arrayBuffer(),{type:"array"});
+  const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:""});
+  const h=rows[0].map(x=>String(x));
+  let ci=h.findIndex(x=>/كود/.test(x)),ni=h.findIndex(x=>/اسم/.test(x)),ai=h.findIndex(x=>/دين|رصيد|مبلغ|باق|مديون/.test(x));
+  if(ni<0||ai<0){ci=0;ni=1;ai=2}
+  const out=[],seen=new Set();
+  for(const r of rows.slice(1)){
+    const amt=parseFloat(a2e(r[ai]).replace(/,/g,""));if(!(amt>0))continue;
+    const {name,phone}=splitCust(r[ni]);if(!name&&!phone)continue;
+    const id=String(r[ci]||name);if(seen.has(id))continue;seen.add(id);
+    out.push({id,name:name||"(بدون اسم)",phone:phone||PH[id]||"",amt});
+  }
+  if(!out.length)throw new Error("no rows");
+  const old=D.rows.length;D={ts:Date.now(),rows:out,sent:{}};dset("dbt",D);renderDbt();
+  say(`اتحمّل ${out.length} عميل${old?" (التقرير القديم اتبدّل)":""}`);
+}
+
+async function importPhones(f){
+  let rows;
+  if(/\.csv$|\.txt$/i.test(f.name)){rows=(await f.text()).split(/\r?\n/).map(l=>l.split(/[,;\t]/))}
+  else{
+    if(!window.XLSX)await new Promise((ok,no)=>{const sc=document.createElement("script");sc.src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";sc.onload=ok;sc.onerror=no;document.head.appendChild(sc)});
+    const wb=XLSX.read(await f.arrayBuffer(),{type:"array"});rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:""});
+  }
+  const m={};let n=0;
+  for(const r of rows){const id=a2e(r[0]).trim();if(!/^\d+$/.test(id))continue;const {phone}=splitCust(String(r[1]||""));if(phone&&!m[id]){m[id]=phone;n++}}
+  if(!n)throw new Error("no phones");
+  PH=m;dset("dbtph",PH);
+  let filled=0;D.rows.forEach(r=>{if(!r.phone&&PH[r.id]){r.phone=PH[r.id];filled++}});dset("dbt",D);renderDbt();
+  say(`اتحمّل ${n} رقم${D.rows.length?`، واتربط ${filled} عميل`:""}`);
+}
+let dUnl=false;
+const sha=async t=>[...new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode("pn:"+t)))].map(b=>b.toString(16).padStart(2,"0")).join("");
+const showDbt=()=>{dUnl=true;$("#dbt").classList.remove("hide");renderDbt()};
+$("#dbtmode").onclick=()=>{
+  if(dUnl)return showDbt();
+  let h="";try{h=localStorage.getItem("dbtpin")||""}catch(e){}
+  open(`<h2>${h?"الرقم السري":"اختار رقم سري"}</h2><p class="meta">${h?"اكتب الرقم السري لفتح مطالبة العملاء.":"الرقم ده هتكتبه كل مرة تفتح فيها الشاشة دي. اختار 4 أرقام أو أكتر."}</p><input class="in" id="pin" type="password" inputmode="numeric" autocomplete="off" style="text-align:center;letter-spacing:6px"><button class="btn" id="pok">${h?"فتح":"حفظ وفتح"}</button><button class="a" id="pcx">إلغاء</button>`);
+  $("#pcx").onclick=close;setTimeout(()=>$("#pin").focus(),50);
+  $("#pin").onkeydown=e=>{if(e.key==="Enter")$("#pok").click()};
+  $("#pok").onclick=async()=>{
+    const v=$("#pin").value.trim();
+    if(!h){if(v.length<4){say("الرقم لازم 4 أرقام على الأقل");return}try{localStorage.setItem("dbtpin",await sha(v))}catch(e){}close();showDbt();return}
+    if(await sha(v)===h){close();showDbt()}else{say("الرقم غلط");$("#pin").value=""}
+  };
+};
+$("#dback").onclick=()=>{$("#dbt").classList.add("hide");dUnl=false};
+$("#dq").oninput=renderDbt;$("#dmin").oninput=renderDbt;
+$("#dflt").onclick=e=>{const b=e.target.closest("button");if(!b)return;dFlt=b.dataset.f;renderDbt()};
+$("#dimp").onclick=()=>{
+  const nph=Object.keys(PH).length;
+  open(`<h2>رفع الملفات</h2><p class="meta">١) تقرير المدينين (إكسل من فارما فلاي: كود العميل، اسم العميل، قيمة الدين). بتعمله كل مرة.</p>
+  <label class="btn" style="text-align:center;position:relative;overflow:hidden;display:block">📂 تقرير المدينين<input id="df" type="file" accept=".xlsx,.xls,.csv" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:0"></label>
+  <p class="meta" style="margin-top:14px">٢) ملف أرقام العملاء (phones.csv). بترفعه مرة وبعدين كل ما تضيف عملاء جداد. ${nph?`الأرقام المحفوظة دلوقتي: ${nph}`:"لسه ما اتحمّلش."}</p>
+  <label class="btn" style="text-align:center;position:relative;overflow:hidden;display:block;background:var(--ord)">📞 ملف الأرقام<input id="dp" type="file" accept=".csv,.txt,.xlsx,.xls" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:0"></label><button class="a" id="dcx">إغلاق</button>`);
+  $("#dcx").onclick=close;
+  $("#df").onchange=async e=>{const f=e.target.files[0];if(!f)return;try{await importDebts(f);close()}catch(err){say("مقدرتش أقرا الملف. تأكد إنه تقرير المدينين (كود، اسم، قيمة الدين).")}};
+  $("#dp").onchange=async e=>{const f=e.target.files[0];if(!f)return;try{await importPhones(f);close()}catch(err){say("مقدرتش أقرا ملف الأرقام. المفروض عمودين: كود العميل ثم الرقم.")}};
+};
+$("#dtpl").onclick=()=>{
+  open(`<h2>نص الرسالة</h2><p class="meta">استخدم {الاسم} و{المبلغ} وهيتبدلوا لكل عميل.</p><textarea class="in" id="dt" rows="6">${esc(dTpl)}</textarea><button class="btn" id="dts">حفظ</button><button class="a" id="dtd">رجّع النص الأصلي</button><button class="a" id="dtc">إلغاء</button>`);
+  $("#dtc").onclick=close;$("#dtd").onclick=()=>{$("#dt").value=DEF_TPL};
+  $("#dts").onclick=()=>{dTpl=$("#dt").value.trim()||DEF_TPL;dset("dbtpl",dTpl);close();renderDbt();say("اتحفظ نص الرسالة")};
+};
+$("#dreset").onclick=()=>{D.sent={};dset("dbt",D);renderDbt();say("اتصفّرت علامات الإرسال")};
+$("#dlist").onclick=e=>{
+  const w=e.target.closest("a.wa,a.sm");
+  if(w){D.sent[w.dataset.id]=Date.now();dset("dbt",D);setTimeout(renderDbt,400);return}
+  const p=e.target.closest("[data-ph]");
+  if(p){const id=p.dataset.ph;
+    open(`<h2>إضافة رقم</h2><input class="in" id="dpn" type="tel" inputmode="tel" placeholder="01xxxxxxxxx" style="direction:ltr"><button class="btn" id="dps">حفظ</button><button class="a" id="dpc">إلغاء</button>`);
+    $("#dpc").onclick=close;
+    $("#dps").onclick=()=>{const {phone}=splitCust($("#dpn").value);if(!phone){say("الرقم مش صحيح (لازم 11 رقم يبدأ بـ 01)");return}
+      const r=D.rows.find(x=>x.id===id);if(r){r.phone=phone;dset("dbt",D)}close();renderDbt()};
+  }
+};
 </script>
 </body>
 </html>
