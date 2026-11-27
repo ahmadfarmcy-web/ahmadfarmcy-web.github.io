@@ -87,11 +87,11 @@ main{padding:12px 16px 110px;display:grid;gap:10px}
 .orow{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 12px}
 .onm{flex:1;font-weight:700;font-size:17px;line-height:1.5}
 .onm small{display:block;color:var(--mute);font-weight:500;font-size:13px}
-.ob{width:56px;height:56px;border-radius:14px;font-size:28px;color:#fff;flex:none}
+.ob{width:44px;height:44px;border-radius:12px;font-size:22px;color:#fff;flex:none;padding:0}
 .ob.yes{background:var(--ok)}.ob.no{background:var(--bad);position:relative;overflow:hidden;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:manipulation}
 .ob.no::after{content:"";position:absolute;inset:0;background:rgba(0,0,0,.35);transform:scaleY(0);transform-origin:bottom;transition:transform 0s}
 .ob.no.hold::after{transform:scaleY(1);transition:transform .7s linear}
-.orow .acts{display:flex;gap:8px;flex:none;align-items:center}.ob.del{width:44px;height:44px;font-size:20px;background:#6b7280}
+.orow .acts{display:flex;gap:5px;flex:none;align-items:center}.ob.del{width:34px;height:34px;font-size:16px;border-radius:10px;background:#6b7280}
 .orow.off{opacity:.6}.orow.done{border-color:var(--ok);background:#eef7f1}
 .sect{font-size:14px;color:var(--mute);margin:12px 2px 0}
 .big{width:100%;padding:14px;font-size:17px}
@@ -642,7 +642,7 @@ function renderOrd(){
   let lastAge=null;
   const dayLbl=a=>{const d=new Date(BD(Date.now())-a*864e5+432e5).toLocaleDateString("en-GB",{day:"2-digit",month:"2-digit"});return (a<=0?"اليوم":a===1?"أمس":a===2?"أول أمس":"أقدم")+" — "+d};
   let h=ok.map(i=>{const a=bdAge(tmOf(i.ts)||Date.now()),hd=(oday==="all"&&a!==lastAge)?`<div class="sect${a>1?" old":""}">${dayLbl(a)}</div>`:"";lastAge=a;
-    return hd+`<div class="orow" data-id="${i.id}">${nm(i)}<div class="acts"><button class="ob del" data-del="1" aria-label="حذف الصنف">🗑</button><button class="ob no" data-nox="1" aria-label="مش موجود عند الشركة (اضغط مطوّل)">✖</button><button class="ob yes" data-o="yes" aria-label="تم الطلب">✔</button></div></div>`}).join("");
+    return hd+`<div class="orow" data-id="${i.id}">${nm(i)}<div class="acts"><button class="ob yes" data-o="yes" aria-label="تم الطلب">✔</button><button class="ob no" data-nox="1" aria-label="مش موجود عند الشركة (اضغط مطوّل)">✖</button><button class="ob del" data-del="1" aria-label="حذف الصنف">🗑</button></div></div>`}).join("");
   if(!ok.length)h+=`<div class="empty">${q?"مفيش صنف بالاسم ده.":"مفيش نواقص متبقية للطلب من "+esc(cur)+" 🎉"}</div>`;
   if(no.length)h+=`<div class="sect">مش موجود عند ${esc(cur)}</div>`+no.map(i=>`<div class="orow off" data-id="${i.id}">${nm(i)}<button class="a" data-o="undono">رجّعه</button></div>`).join("");
   if(done.length)h+=`<div class="sect">اتطلب دلوقتي من الشركة</div>`+done.map(i=>`<div class="orow done" data-id="${i.id}"><div class="onm">${esc(i.name)}<small>اتطلب من ${esc(i.supplier||"")}</small></div><button class="a" data-o="undoyes">تراجع</button></div>`).join("");
